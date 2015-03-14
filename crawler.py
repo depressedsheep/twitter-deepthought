@@ -11,9 +11,9 @@ except:
 #import io
 import bz2 #file compression
 
-RAW_FILE = 'raw'
-RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
-DECOMPRESSED_FILE = 'raw_decompressed'
+#RAW_FILE = 'raw'
+#RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
+#DECOMPRESSED_FILE = 'raw_decompressed'
 BUCKET_NAME = 'twitter-deepthought'
 def oauth_login(): #authenticate w twitter API
 	CONSUMER_KEY = ck
@@ -26,7 +26,7 @@ def oauth_login(): #authenticate w twitter API
 	return twitter_api
 
 """ ---- DO THINGS ---- """
-def crawl():
+def crawl(_duration):
 	start_time = int(time.time()) #seconds from epoch
 	twitter_api = oauth_login()
 	print twitter_api
@@ -34,44 +34,45 @@ def crawl():
 	stream = twitter_stream.statuses.sample(language = 'en')
 	#c = 2 #placeholder, just to make sure the streaming ends for debugging
 	#outfile = open(RAW_FILE,'w') #file is opened for its lifetime as it is a better practice
-	outcompress = bz2.BZ2Compressor()
 	datetime_ = str(datetime.datetime.now())[:-7]
-	outcompressfile = open('raw_compressed.bz2','w')
+	if not os.path.exists('compressed-tweets'):
+		os.makedirs('compressed-tweets')
+
+	outcompressfile = open(os.path.join('compressed-tweets',datetime_+'.bz2'),'w')
+	outcompress = bz2.BZ2Compressor()
+	
 	for tweet in stream:
 		#c -= 1
 		current_time = int(time.time()) - start_time
 		current_datetime = str(datetime.datetime.now())[:-7]
 		outcompress.compress(json.dumps(tweet) + '\n')
-
 		#print json.dumps(tweet, indent = 1)
 		#print current_time
 		
 		#json.dump(tweet,outfile)
 		try: 
-			tweet['text'].encode('ascii', 'ignore')
+			print tweet['text'].encode('ascii', 'ignore')
 		except:
 			pass
 		#outfile.write('\n')
-		if current_time > 5:
+		if current_time > _duration:
 			outcompressfile.write(outcompress.flush())
 			#print len(repr(outcompress.flush()))2
 			break
-def decompress():
-	f = open(DECOMPRESSED_FILE ,'w')
-	#for line in f:
-	#	print line
+def decompress(filedate):
+	if not os.path.exists('decompressed-tweets'):
+		os.makedirs('decompressed-tweets')
+	f = open(os.path.join('decompressed-tweets', filedate + '.bz2') ,'w')
 	
 	indecompress = bz2.BZ2Decompressor()
-	compressedfile = open(RAW_COMPRESSED_FILE, 'r')
+	compressedfile = open(os.path.join('raw-tweets', filedate + '.bz2') ,'r')
 	for line in compressedfile:
 		f.write(indecompress.decompress(line))
 def trends():
 	datetime_ = str(datetime.datetime.now())[:-7]
-	if os.path.exists('trends'):
-		f = open(os.path.join('trends',datetime_ + ' ' + 'sg_trends'), 'w')
-	else:
+	if not os.path.exists('trends'):
 		os.makedirs('trends')
-	
+	f = open(os.path.join('trends',datetime_ + ' ' + 'sg-trends'), 'w')
 	def twitter_trends(twitter_api, woe_id):
 		return twitter_api.trends.place(_id = woe_id)
 	twitter_api = oauth_login()
@@ -90,6 +91,6 @@ def boto_save(key, filename):
 	k.set_contents_from_filename(filename)
 
 if __name__ == "__main__":
-	#crawl()		
+	crawl(5)		
 	#decompress()
 	#trends()
