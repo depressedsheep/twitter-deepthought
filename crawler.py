@@ -3,6 +3,7 @@ import twitter
 import json
 from config import ck, cs, ot, ots
 from boto.s3.connection import S3Connection
+from boto.s3.key import Key as botoKey
 try:
 	from config import boto_access, boto_secret
 except:
@@ -78,12 +79,17 @@ def trends():
 	sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
 	f.write(json.dumps(sg_trends, indent = 1))
 
-def boto_save():
+def boto_save(key, filename):
 	conn = S3Connection(boto_access, boto_secret)
-def boto_init():
-	conn = S3Connection(boto_access, boto_secret)
-	bucket = conn.create_bucket(BUCKET_NAME)
+	try:
+		bucket = conn.create_bucket(BUCKET_NAME, location =Location.SAEast)
+	except:
+		bucket = conn.get_bucket(BUCKET_NAME)
+	k = Key(bucket)
+	k.key = key
+	k.set_contents_from_filename(filename)
+
 if __name__ == "__main__":
 	#crawl()		
 	#decompress()
-	trends()
+	#trends()
