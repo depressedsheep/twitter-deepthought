@@ -64,6 +64,19 @@ def decompress():
 	compressedfile = open(RAW_COMPRESSED_FILE, 'r')
 	for line in compressedfile:
 		f.write(indecompress.decompress(line))
+def trends():
+	datetime_ = str(datetime.datetime.now())[:-7]
+	if os.path.exists('trends'):
+		f = open(os.path.join('trends',datetime_ + ' ' + 'sg_trends'), 'w')
+	else:
+		os.makedirs('trends')
+	
+	def twitter_trends(twitter_api, woe_id):
+		return twitter_api.trends.place(_id = woe_id)
+	twitter_api = oauth_login()
+	SG_WOE_ID = 1062617
+	sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
+	f.write(json.dumps(sg_trends, indent = 1))
 
 def boto_save():
 	conn = S3Connection(boto_access, boto_secret)
@@ -72,4 +85,5 @@ def boto_init():
 	bucket = conn.create_bucket(BUCKET_NAME)
 if __name__ == "__main__":
 	#crawl()		
-	decompress()
+	#decompress()
+	trends()
