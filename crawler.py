@@ -11,7 +11,7 @@ except:
 import bz2 #file compression
 
 RAW_FILE = 'raw'
-RAW_COMPRESSED_FILE = 'raw_compressed'
+RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 DECOMPRESSED_FILE = 'raw_decompressed'
 BUCKET_NAME = 'twitter-deepthought'
 def oauth_login(): #authenticate w twitter API
@@ -32,30 +32,30 @@ def crawl():
 	twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
 	stream = twitter_stream.statuses.sample(language = 'en')
 	#c = 2 #placeholder, just to make sure the streaming ends for debugging
-	outfile = open(RAW_FILE,'w') #file is opened for its lifetime as it is a better practice
+	#outfile = open(RAW_FILE,'w') #file is opened for its lifetime as it is a better practice
 	outcompress = bz2.BZ2Compressor()
 	datetime_ = str(datetime.datetime.now())[:-7]
-	outcompressfile = open('raw_compressed','w')
+	outcompressfile = open('raw_compressed.bz2','w')
 	for tweet in stream:
 		#c -= 1
 		current_time = int(time.time()) - start_time
 		current_datetime = str(datetime.datetime.now())[:-7]
-		outcompress.compress(json.dumps(tweet) + '\n\n')
+		outcompress.compress(json.dumps(tweet) + '\n')
 
 		#print json.dumps(tweet, indent = 1)
-		print current_time
+		#print current_time
 		
-		json.dump(tweet,outfile)
+		#json.dump(tweet,outfile)
 		try: 
 			tweet['text'].encode('ascii', 'ignore')
 		except:
 			pass
-		outfile.write('\n')
-		if current_time > 2:
+		#outfile.write('\n')
+		if current_time > 5:
 			outcompressfile.write(outcompress.flush())
 			#print len(repr(outcompress.flush()))2
 			break
-def read():
+def decompress():
 	f = open(DECOMPRESSED_FILE ,'w')
 	#for line in f:
 	#	print line
@@ -63,12 +63,7 @@ def read():
 	indecompress = bz2.BZ2Decompressor()
 	compressedfile = open(RAW_COMPRESSED_FILE, 'r')
 	for line in compressedfile:
-		#print len(line)
-		_text = indecompress.decompress(line)
-
-		if '\n' in _text:
-			print "!!!"
-			f.write(str(_text.split('\n')))
+		f.write(indecompress.decompress(line))
 
 def boto_save():
 	conn = S3Connection(boto_access, boto_secret)
@@ -76,5 +71,5 @@ def boto_init():
 	conn = S3Connection(boto_access, boto_secret)
 	bucket = conn.create_bucket(BUCKET_NAME)
 if __name__ == "__main__":
-	crawl()	
-	#read()
+	#crawl()		
+	decompress()
