@@ -1,6 +1,7 @@
 import os, sys, time, datetime
 import twitter
 import json
+import pymongo
 from config import ck, cs, ot, ots
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key as botoKey
@@ -10,11 +11,37 @@ except:
 	pass
 #import io
 import bz2 #file compression
-
+#
 #RAW_FILE = 'raw'
 #RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 #DECOMPRESSED_FILE = 'raw_decompressed'
 BUCKET_NAME = 'twitter-deepthought'
+#
+
+def save_to_mongo(data, mongo_db, mongo_db_coll, **mongo_conn_kw):
+	#default is localhost:27017	
+	client = pymongo.MongoClient('mongodb://localhost:27017/')
+	db = client[mongo_db]
+	coll = db[mongo_db_coll]
+	return coll.insert(data)
+def load_from_mongo(mongo_db, mongo_db_coll, return_cursor=False, criteria = None, projection=None, **mongo_conn_kw):
+	#criteria & projection limits data
+	#consider the aggregations framework for more sophiscated queries
+	client = pymongo.MongoClient(**mongo_conn_kw)
+	db = client[mongo_db]
+	coll = db[mongo_db_coll]
+	if criteria is None:
+		criteria = {}
+	if projection is None:
+		cursor = coll.find(criteria)
+	else:
+		cursor = coll.find(criteria, projection)
+	if return_cursor:
+		return cursor
+	else:
+		return [item for item in cursor]
+
+
 def oauth_login(): #authenticate w twitter API
 	CONSUMER_KEY = ck
 	CONSUMER_SECRET = cs
@@ -38,25 +65,26 @@ def crawl(_duration):
 	if not os.path.exists('compressed-tweets'):
 		os.makedirs('compressed-tweets')
 
-	outcompressfile = open(os.path.join('compressed-tweets',datetime_+'.bz2'),'w')
-	outcompress = bz2.BZ2Compressor()
+	#outcompressfile = open(os.path.join('compressed-tweets',datetime_+'.bz2'),'w')
+	#outcompress = bz2.BZ2Compressor()
 	
 	for tweet in stream:
 		#c -= 1
 		current_time = int(time.time()) - start_time
 		current_datetime = str(datetime.datetime.now())[:-7]
-		outcompress.compress(json.dumps(tweet) + '\n')
+		save_to_mongo(tweet,str(datetime.datetime.now())[:13].replace(' ',''), 'universe')
+		#outcompress.compress(json.dumps(tweet) + '\n')
 		#print json.dumps(tweet, indent = 1)
 		#print current_time
 		
 		#json.dump(tweet,outfile)
-		try: 
-			print tweet['text'].encode('ascii', 'ignore')
-		except:
-			pass
+		#try: 
+		#	print tweet['text'].encode('ascii', 'ignore')
+		#except:
+		#	pass
 		#outfile.write('\n')
 		if current_time > _duration:
-			outcompressfile.write(outcompress.flush())
+			#outcompressfile.write(outcompress.flush())
 			#print len(repr(outcompress.flush()))2
 			break
 def decompress(filedate):
@@ -91,6 +119,7 @@ def boto_save(key, filename):
 	k.set_contents_from_filename(filename)
 
 if __name__ == "__main__":
-	crawl(5)		
+	#crawl(15)
+	#print load_from_mongo('2015-03-2022', 'universe')
 	#decompress()
-	#trends()
+	#trends() 'universe')
