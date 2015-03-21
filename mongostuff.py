@@ -25,4 +25,5 @@ def load(mongo_db, mongo_db_coll, return_cursor=False, criteria = None, projecti
 	if return_cursor:
 		return cursor
 	else:
-		return [item for item in cursor]
+		 for item in curosr:
+		 	yield item # reducing overhead by using a generator 
