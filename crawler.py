@@ -46,7 +46,7 @@ def crawl(_duration):
 		#c -= 1
 		current_time = int(time.time()) - start_time
 		current_datetime = str(datetime.datetime.now())[:-7]
-		mongostuff.save(tweet,str(datetime.datetime.now())[:13].replace(' ',''), 'universe')
+		mongostuff.save(tweet,'universe',str(datetime.datetime.now())[:13].replace(' ','_'))
 		#outcompress.compress(json.dumps(tweet) + '\n')
 		#print json.dumps(tweet, indent = 1)
 		#print current_time
