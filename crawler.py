@@ -93,8 +93,22 @@ def boto_save(key, filename):
 	k.key = key
 	k.set_contents_from_filename(filename)
 
+#this function is purely for convenience, you know.
+def time_change(t, units):
+	# use: time_change(1, 'minute')
+	# returns 60
+	if units == 'minute':
+		return t * 60
+	elif units == 'hour':
+		return t * 60 * 60
+	elif units == 'day':
+		return t * 60 * 60 * 24
+	else:
+		raise ValueError("Typo in the units?")
+
 if __name__ == "__main__":
 	crawl(15)
 	#print load_from_mongo('2015-03-2022', 'universe')
 	#decompress()
 	#trends() 'universe')
+
