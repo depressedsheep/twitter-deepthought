@@ -11,6 +11,11 @@ from crawler import decompress
 from gensim import corpora, models, similarities
 import logging
 import os
-
+import mongostuff
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
+def removestopwords(text):
+	return [i for i in sentence.split() if i not in stop]
 
