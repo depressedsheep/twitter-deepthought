@@ -11,11 +11,24 @@ from crawler import decompress
 from gensim import corpora, models, similarities
 import logging
 import os
-import mongostuff
+import botostuff
 from nltk.corpus import stopwords
+
 stop = stopwords.words('english')
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 def removestopwords(text):
-	return [i for i in sentence.split() if i not in stop]
+	text = text.encode('ascii', 'ignore')
+	stoppedtext = [i.lower() for i in text.split() if i not in stop]
+	return stoppedtext
+#
+# this part assumes loading from boto
+def process(filename, initcorpora = False): #collection name (e.g. 2015-03-21_18)
+	if initcorpora == True:
+		
 
+
+
+if __name__ == '__main__':
+	#print removestopwords('This is a placeholder sentence, because I\'m bored.')
+	process('2015-03-21_18', initcorpora = True)
