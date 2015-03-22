@@ -10,15 +10,23 @@ try:
 except:
 	pass
 #import io
+import bz2
 import atexit
 import threading
 import platform
 import time
+from collections import deque
 from shutil import copyfileobj
 #RAW_FILE = 'raw'
 #RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 #DECOMPRESSED_FILE = 'raw_decompressed'
 BUCKET_NAME = 'twitter-deepthought'
+
+def r(x,n):
+	if int(x) == 0:
+		return 0
+	else:
+		return round(x, int(n - math.ceil(math.log10(abs(x)))))
 def main():
 	c = Crawler()
 	try:
@@ -29,6 +37,13 @@ def main():
 class Crawler(object):
 	def __init__(self):
 		self.num_tweets = 0
+		self.num_tweets_ = 0
+		self.sma_tweets = deque([0] * 600)
+		try:
+			os.remove('temp')
+			os.remove('temp1')
+		except:
+			pass
 		self.start_time = int(time.time())
 		self.start_date = str(datetime.datetime.now())[:-7]
 		self.tfpswitch = 'f'
@@ -36,7 +51,7 @@ class Crawler(object):
 		self.f = open('temp', 'wb')
 		#self.g = open('temp1','wb')
 		self.hour = datetime.datetime.now().hour
-
+		self.second = datetime.datetime.now().second
 		twitter_api = oauth_login()
 		twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
 		self.stream = twitter_stream.statuses.sample(language = 'en')
@@ -44,9 +59,17 @@ class Crawler(object):
 		self.print_status()
 		for tweet in self.stream:
 			self.num_tweets += 1
+			self.num_tweets_ += 1
 			self.c_hour = datetime.datetime.now().hour
+			self.c_second = datetime.datetime.now().second
 			#change hour
+			if self.c_second != self.second:
+				self.second = self.c_second
+				self.sma_tweets.pop()
+				self.sma_tweets.appendleft(self.num_tweets_)
+				self.num_tweets_ = 0
 			if self.c_hour != self.hour:
+			#if self.c_second != self.second:
 				if self.tfpswitch == 'f':
 					self.f.close()
 					try:
@@ -67,6 +90,7 @@ class Crawler(object):
 				self.update.daemon = True
 				self.update.start()
 				
+				#self.second = self.c_second
 				self.hour = self.c_hour
 			else:
 				if self.tfpswitch == 'f':
@@ -75,16 +99,18 @@ class Crawler(object):
 					self.g.write(json.dumps(tweet))
 				
 	def save_lasthour(self, fg):
-		if fg == 'g':			
+		if fg == 'g':
+			print "attempting to compress"			
 			with open('temp', 'rb') as input:
-				with bz2.BZ2File(os.join.path('compressed-tweets', self.compressedfp), 'rb', compresslevel = 9) as output:
+				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
 					copyfileobj(input, output)
 			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'
 			return
 
 		else:
+			print "attempting to compress"			
 			with open('temp1', 'rb') as input:
-				with bz2.BZ2File(os.join.path('compressed-tweets', self.compressedfp), 'rb', compresslevel = 9) as output:
+				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
 					copyfileobj(input, output)
 			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'			
 			return
@@ -109,8 +135,8 @@ class Crawler(object):
 		
 		print "Current number of tweets: " + str(self.num_tweets)
 		#print "Current file size: " + str(os.path.getsize(filepath)/(1000000)) + "mb"
-		print "Time elapsed: " + str(int(time.time()-self.start_time)/(60*60)) + "h"
-		print "Avg tweets per second: " + str(self.num_tweets/int(time.time()-self.start_time))
+		print "Time elapsed: " + str(int(time.time()-self.start_time)/(60*60)) + "h " + str((int(time.time() - self.start_time)%3600)/60) + "m"
+		print "Moving tweet frequency average (SMA) for past 10 minutes: " + str(r(sum(self.sma_tweets)/float(len(self.sma_tweets)),3))
 		print "\n Ctrl+C to stop crawling"
 
 
