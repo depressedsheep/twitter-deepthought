@@ -3,12 +3,7 @@ import twitter
 import json
 import mongostuff
 from config import ck, cs, ot, ots
-from boto.s3.connection import S3Connection
-from boto.s3.key import Key as botoKey
-try:
-	from config import boto_access, boto_secret
-except:
-	pass
+import botostuff
 #import io
 import bz2
 import atexit
@@ -100,16 +95,13 @@ class Crawler(object):
 					self.g.write(json.dumps(tweet))
 				
 	def save_lasthour(self, fg):
-		bucket = conn.create_bucket('twitter-deepthought_' + str(datetime.datetime.now())[:13].replace(' '
-				, '_'))
-
 		if fg == 'g':
 			print "attempting to compress"			
 			with open('temp', 'rb') as input:
 				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
 					copyfileobj(input, output)
 			
-			boto_save(str(datetime.datetime.now())[:13].replace(' '
+			botostuff.save(str(datetime.datetime.now())[:13].replace(' '
 				, '_')), os.path.join('compressed-tweets', self.compressedfp)
 			self.compressedfp = str(datetime.datetime.now())[:13].replace(' '
 				, '_') + '.bz2'
@@ -183,15 +175,6 @@ def trends():
 	sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
 	f.write(json.dumps(sg_trends, indent = 1))
 
-def boto_save(key, filename, BUCKET_NAM = 'twitter-deepthought'):
-	conn = S3Connection(boto_access, boto_secret)
-	try:
-		bucket = conn.create_bucket(BUCKET_NAME, location =Location.SAEast)
-	except:
-		bucket = conn.get_bucket(BUCKET_NAME)
-	k = Key(bucket)
-	k.key = key
-	k.set_contents_from_filename(filename)
 
 #this function is purely for convenience, you know.
 def time_change(t, units):
