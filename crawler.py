@@ -17,10 +17,11 @@ import platform
 import time
 from collections import deque
 from shutil import copyfileobj
+import numpy as np
+import math
 #RAW_FILE = 'raw'
 #RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 #DECOMPRESSED_FILE = 'raw_decompressed'
-BUCKET_NAME = 'twitter-deepthought'
 
 def r(x,n):
 	if int(x) == 0:
@@ -47,7 +48,7 @@ class Crawler(object):
 		self.start_time = int(time.time())
 		self.start_date = str(datetime.datetime.now())[:-7]
 		self.tfpswitch = 'f'
-		self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'
+		self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.bz2'
 		self.f = open('temp', 'wb')
 		#self.g = open('temp1','wb')
 		self.hour = datetime.datetime.now().hour
@@ -99,12 +100,19 @@ class Crawler(object):
 					self.g.write(json.dumps(tweet))
 				
 	def save_lasthour(self, fg):
+		bucket = conn.create_bucket('twitter-deepthought_' + str(datetime.datetime.now())[:13].replace(' '
+				, '_'))
+
 		if fg == 'g':
 			print "attempting to compress"			
 			with open('temp', 'rb') as input:
 				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
 					copyfileobj(input, output)
-			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'
+			
+			boto_save(str(datetime.datetime.now())[:13].replace(' '
+				, '_')), os.path.join('compressed-tweets', self.compressedfp)
+			self.compressedfp = str(datetime.datetime.now())[:13].replace(' '
+				, '_') + '.bz2'
 			return
 
 		else:
@@ -112,7 +120,7 @@ class Crawler(object):
 			with open('temp1', 'rb') as input:
 				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
 					copyfileobj(input, output)
-			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'			
+			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.bz2'			
 			return
 	def stop(self):
 		print 'Crawling stopped/interrupted'
@@ -131,13 +139,17 @@ class Crawler(object):
 		os_name = platform.system()
 		if os_name == "Windows": os.system('cls')
 		elif os_name == "Linux": os.system('clear')
-		else: print "\n"*100
+		else: print "something wrong"
 		
 		print "Current number of tweets: " + str(self.num_tweets)
 		#print "Current file size: " + str(os.path.getsize(filepath)/(1000000)) + "mb"
 		print "Time elapsed: " + str(int(time.time()-self.start_time)/(60*60)) + "h " + str((int(time.time() - self.start_time)%3600)/60) + "m"
-		print "Moving tweet frequency average (SMA) for past 10 minutes: " + str(r(sum(self.sma_tweets)/float(len(self.sma_tweets)),3))
-		print "\n Ctrl+C to stop crawling"
+		try:
+			print "Moving tweet frequency average (SMA) for past 10 minutes: " + str(sum(self.sma_tweets)/float(np.count_nonzero(self.sma_tweets)))
+
+		except:
+			print "Moving tweet frequency average (SMA) for past 10 minutes: 0"
+		print "\nCtrl+C to stop crawling"
 
 
 def oauth_login(): #authenticate w twitter API
@@ -171,7 +183,7 @@ def trends():
 	sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
 	f.write(json.dumps(sg_trends, indent = 1))
 
-def boto_save(key, filename):
+def boto_save(key, filename, BUCKET_NAM = 'twitter-deepthought'):
 	conn = S3Connection(boto_access, boto_secret)
 	try:
 		bucket = conn.create_bucket(BUCKET_NAME, location =Location.SAEast)
