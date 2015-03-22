@@ -10,8 +10,11 @@ try:
 except:
 	pass
 #import io
-import bz2 #file compression
-#
+import atexit
+import threading
+import platform
+import time
+from shutil import copyfileobj
 #RAW_FILE = 'raw'
 #RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 #DECOMPRESSED_FILE = 'raw_decompressed'
@@ -23,41 +26,77 @@ def main():
 	except KeyboardInterrupt:
 		c.stop()
 
-
-def oauth_login(): #authenticate w twitter API
-	CONSUMER_KEY = ck
-	CONSUMER_SECRET = cs
-	OAUTH_TOKEN = ot
-	OAUTH_TOKEN_SECRET = ots
-
-	auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET, CONSUMER_KEY, CONSUMER_SECRET)
-	twitter_api = twitter.Twitter(auth=auth)
-	return twitter_api
-
 class Crawler(object):
-	
 	def __init__(self):
-		self.start_time = int(time())
 		self.num_tweets = 0
-		self.f = gzip.open(FILE_PATH, 'wb')
-		
+		self.start_time = int(time.time())
+		self.start_date = str(datetime.datetime.now())[:-7]
+		self.tfpswitch = 'f'
+		self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'
+		self.f = open('temp', 'wb')
+		#self.g = open('temp1','wb')
+		self.hour = datetime.datetime.now().hour
+
 		twitter_api = oauth_login()
 		twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
 		self.stream = twitter_stream.statuses.sample(language = 'en')
-		
 	def start(self):
 		self.print_status()
-		
 		for tweet in self.stream:
 			self.num_tweets += 1
-			self.f.write(json.dumps(tweet))
-	
+			self.c_hour = datetime.datetime.now().hour
+			#change hour
+			if self.c_hour != self.hour:
+				if self.tfpswitch == 'f':
+					self.f.close()
+					try:
+						os.remove('temp1')
+					except:
+						pass
+					self.tfpswitch = 'g'
+					self.g = open('temp1','wb')
+				else:
+					self.tfpswitch = 'f'
+					try:
+						os.remove('temp')
+					except:
+						pass
+					self.g.close()
+					self.f = open('temp', 'wb')
+				self.update = threading.Thread(target=self.save_lasthour, args=(self.tfpswitch,))
+				self.update.daemon = True
+				self.update.start()
+				
+				self.hour = self.c_hour
+			else:
+				if self.tfpswitch == 'f':
+					self.f.write(json.dumps(tweet))
+				else:
+					self.g.write(json.dumps(tweet))
+				
+	def save_lasthour(self, fg):
+		if fg == 'g':			
+			with open('temp', 'rb') as input:
+				with bz2.BZ2File(os.join.path('compressed-tweets', self.compressedfp), 'rb', compresslevel = 9) as output:
+					copyfileobj(input, output)
+			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'
+			return
+
+		else:
+			with open('temp1', 'rb') as input:
+				with bz2.BZ2File(os.join.path('compressed-tweets', self.compressedfp), 'rb', compresslevel = 9) as output:
+					copyfileobj(input, output)
+			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.gz'			
+			return
 	def stop(self):
 		print 'Crawling stopped/interrupted'
 		self.f.close()
-		
+		try:
+			self.g.close()
+		except:
+			pass
 	def print_status(self):
-		# Print status every 1.0 second
+				# Print status every 1.0 second
 		self.t = threading.Timer(1.0, self.print_status)
 		self.t.daemon = True
 		self.t.start()
@@ -69,10 +108,21 @@ class Crawler(object):
 		else: print "\n"*100
 		
 		print "Current number of tweets: " + str(self.num_tweets)
-		print "Current file size: " + str(os.path.getsize(FILE_PATH)/(1000000)) + "mb"
-		print "Time elapsed: " + str(int(time()-self.start_time)/(60*60)) + "h"
-		print "Avg tweets per second: " + str(self.num_tweets/int(time()-self.start_time))
+		#print "Current file size: " + str(os.path.getsize(filepath)/(1000000)) + "mb"
+		print "Time elapsed: " + str(int(time.time()-self.start_time)/(60*60)) + "h"
+		print "Avg tweets per second: " + str(self.num_tweets/int(time.time()-self.start_time))
 		print "\n Ctrl+C to stop crawling"
+
+
+def oauth_login(): #authenticate w twitter API
+	CONSUMER_KEY = ck
+	CONSUMER_SECRET = cs
+	OAUTH_TOKEN = ot
+	OAUTH_TOKEN_SECRET = ots
+
+	auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET, CONSUMER_KEY, CONSUMER_SECRET)
+	twitter_api = twitter.Twitter(auth=auth)
+	return twitter_api
 
 def decompress(filedate):
 	if not os.path.exists('decompressed-tweets'):
