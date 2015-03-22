@@ -16,6 +16,14 @@ import bz2 #file compression
 #RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
 #DECOMPRESSED_FILE = 'raw_decompressed'
 BUCKET_NAME = 'twitter-deepthought'
+def main():
+	c = Crawler()
+	try:
+		c.start()
+	except KeyboardInterrupt:
+		c.stop()
+
+
 def oauth_login(): #authenticate w twitter API
 	CONSUMER_KEY = ck
 	CONSUMER_SECRET = cs
@@ -26,41 +34,45 @@ def oauth_login(): #authenticate w twitter API
 	twitter_api = twitter.Twitter(auth=auth)
 	return twitter_api
 
-""" ---- DO THINGS ---- """
-def crawl(_duration):
-	start_time = int(time.time()) #seconds from epoch
-	twitter_api = oauth_login()
-	print twitter_api
-	twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
-	stream = twitter_stream.statuses.sample(language = 'en')
-	#c = 2 #placeholder, just to make sure the streaming ends for debugging
-	#outfile = open(RAW_FILE,'w') #file is opened for its lifetime as it is a better practice
-	datetime_ = str(datetime.datetime.now())[:-7]
-	if not os.path.exists('compressed-tweets'):
-		os.makedirs('compressed-tweets')
-
-	#outcompressfile = open(os.path.join('compressed-tweets',datetime_+'.bz2'),'w')
-	#outcompress = bz2.BZ2Compressor()
+class Crawler(object):
 	
-	for tweet in stream:
-		#c -= 1
-		current_time = int(time.time()) - start_time
-		current_datetime = str(datetime.datetime.now())[:-7]
-		mongostuff.save(tweet,'universe',str(datetime.datetime.now())[:13].replace(' ','_'))
-		#outcompress.compress(json.dumps(tweet) + '\n')
-		#print json.dumps(tweet, indent = 1)
-		#print current_time
+	def __init__(self):
+		self.start_time = int(time())
+		self.num_tweets = 0
+		self.f = gzip.open(FILE_PATH, 'wb')
 		
-		#json.dump(tweet,outfile)
-		#try: 
-		#	print tweet['text'].encode('ascii', 'ignore')
-		#except:
-		#	pass
-		#outfile.write('\n')
-		if current_time > _duration:
-			#outcompressfile.write(outcompress.flush())
-			#print len(repr(outcompress.flush()))2
-			break
+		twitter_api = oauth_login()
+		twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
+		self.stream = twitter_stream.statuses.sample(language = 'en')
+		
+	def start(self):
+		self.print_status()
+		
+		for tweet in self.stream:
+			self.num_tweets += 1
+			self.f.write(json.dumps(tweet))
+	
+	def stop(self):
+		print 'Crawling stopped/interrupted'
+		self.f.close()
+		
+	def print_status(self):
+		# Print status every 1.0 second
+		self.t = threading.Timer(1.0, self.print_status)
+		self.t.daemon = True
+		self.t.start()
+		
+		# Attempt to clear the terminal
+		os_name = platform.system()
+		if os_name == "Windows": os.system('cls')
+		elif os_name == "Linux": os.system('clear')
+		else: print "\n"*100
+		
+		print "Current number of tweets: " + str(self.num_tweets)
+		print "Current file size: " + str(os.path.getsize(FILE_PATH)/(1000000)) + "mb"
+		print "Time elapsed: " + str(int(time()-self.start_time)/(60*60)) + "h"
+		print "Avg tweets per second: " + str(self.num_tweets/int(time()-self.start_time))
+		print "\n Ctrl+C to stop crawling"
 
 def decompress(filedate):
 	if not os.path.exists('decompressed-tweets'):
@@ -107,7 +119,7 @@ def time_change(t, units):
 		raise ValueError("Typo in the units?")
 
 if __name__ == "__main__":
-	crawl(15)
+	main()
 	#print load_from_mongo('2015-03-2022', 'universe')
 	#decompress()
 	#trends() 'universe')
