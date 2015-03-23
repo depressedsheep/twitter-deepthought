@@ -1,197 +1,214 @@
-import os, sys, time, datetime
-import twitter
+import os
+import time
+import datetime
 import json
-import mongostuff
-from config import ck, cs, ot, ots
-import botostuff
-#import io
-import bz2
-import atexit
+import twitter
+import gzip
 import threading
 import platform
-import time
 from collections import deque
-from shutil import copyfileobj
 import numpy as np
-import math
-#RAW_FILE = 'raw'
-#RAW_COMPRESSED_FILE = 'raw_compressed.bz2'
-#DECOMPRESSED_FILE = 'raw_decompressed'
+from boto.s3.connection import Location, S3Connection
+from boto.s3.key import Key
+from config import ck, cs, ot, ots, boto_access, boto_secret
 
-def r(x,n):
-	if int(x) == 0:
-		return 0
-	else:
-		return round(x, int(n - math.ceil(math.log10(abs(x)))))
+CONSUMER_KEY = ck
+CONSUMER_SECRET = cs
+OAUTH_TOKEN = ot
+OAUTH_TOKEN_SECRET = ots
+
+
 def main():
-	c = Crawler()
-	try:
-		c.start()
-	except KeyboardInterrupt:
-		c.stop()
+    # Run crawler
+    c = Crawler()
+    try:
+        c.start()
+    except KeyboardInterrupt:
+        c.stop()
+
+
+def init_twitter_api():
+    """ Initializes a Twitter API object """
+    # Authenticate with twitter api
+    auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET, CONSUMER_KEY, CONSUMER_SECRET)
+    twitter_api = twitter.Twitter(auth=auth)
+    return twitter_api
+
+
+def upload_file(file_path, key, bucket_name='twitter-deepthought'):
+    """ Uploads the specified file to Amazon S3 through Boto
+    :param file_path: The file path
+    """
+    # Authenticate with Amazon S3
+    conn = S3Connection(boto_access, boto_secret)
+
+    # If specified bucket doesn't exist, create it
+    # Else, simply access it
+    if conn.lookup(bucket_name) is None:
+        bucket = conn.create_bucket(bucket_name, location=Location.SAEast)
+    else:
+        bucket = conn.get_bucket(bucket_name)
+
+    # Store the file with specified key
+    k = Key(bucket)
+    k.key = key
+    try:
+        k.set_contents_from_filename(file_path)
+    except:
+        pass
+
 
 class Crawler(object):
-	def __init__(self):
-		self.num_tweets = 0
-		self.num_tweets_ = 0
-		self.sma_tweets = deque([0] * 600)
-		try:
-			os.remove('temp')
-			os.remove('temp1')
-		except:
-			pass
-		self.start_time = int(time.time())
-		self.start_date = str(datetime.datetime.now())[:-7]
-		self.tfpswitch = 'f'
-		self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.bz2'
-		self.f = open('temp', 'wb')
-		#self.g = open('temp1','wb')
-		self.hour = datetime.datetime.now().hour
-		self.second = datetime.datetime.now().second
-		twitter_api = oauth_login()
-		twitter_stream = twitter.TwitterStream(auth=twitter_api.auth)
-		self.stream = twitter_stream.statuses.sample(language = 'en')
-	def start(self):
-		self.print_status()
-		for tweet in self.stream:
-			self.num_tweets += 1
-			self.num_tweets_ += 1
-			self.c_hour = datetime.datetime.now().hour
-			self.c_second = datetime.datetime.now().second
-			#change hour
-			if self.c_second != self.second:
-				self.second = self.c_second
-				self.sma_tweets.pop()
-				self.sma_tweets.appendleft(self.num_tweets_)
-				self.num_tweets_ = 0
-			if self.c_hour != self.hour:
-			#if self.c_second != self.second:
-				if self.tfpswitch == 'f':
-					self.f.close()
-					try:
-						os.remove('temp1')
-					except:
-						pass
-					self.tfpswitch = 'g'
-					self.g = open('temp1','wb')
-				else:
-					self.tfpswitch = 'f'
-					try:
-						os.remove('temp')
-					except:
-						pass
-					self.g.close()
-					self.f = open('temp', 'wb')
-				self.update = threading.Thread(target=self.save_lasthour, args=(self.tfpswitch,))
-				self.update.daemon = True
-				self.update.start()
-				
-				#self.second = self.c_second
-				self.hour = self.c_hour
-			else:
-				if self.tfpswitch == 'f':
-					self.f.write(json.dumps(tweet))
-				else:
-					self.g.write(json.dumps(tweet))
-				
-	def save_lasthour(self, fg):
-		if fg == 'g':
-			print "attempting to compress"			
-			with open('temp', 'rb') as input:
-				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
-					copyfileobj(input, output)
-			
-			botostuff.save(str(datetime.datetime.now())[:13].replace(' '
-				, '_')), os.path.join('compressed-tweets', self.compressedfp)
-			self.compressedfp = str(datetime.datetime.now())[:13].replace(' '
-				, '_') + '.bz2'
-			return
+    """ Accepts Twitter tweet stream and save them hourly
 
-		else:
-			print "attempting to compress"			
-			with open('temp1', 'rb') as input:
-				with bz2.BZ2File(os.path.join('compressed-tweets', self.compressedfp), 'wb', compresslevel = 9) as output:
-					copyfileobj(input, output)
-			self.compressedfp = str(datetime.datetime.now())[:13].replace(' ', '_') + '.bz2'			
-			return
-	def stop(self):
-		print 'Crawling stopped/interrupted'
-		self.f.close()
-		try:
-			self.g.close()
-		except:
-			pass
-	def print_status(self):
-				# Print status every 1.0 second
-		self.t = threading.Timer(1.0, self.print_status)
-		self.t.daemon = True
-		self.t.start()
-		
-		# Attempt to clear the terminal
-		os_name = platform.system()
-		if os_name == "Windows": os.system('cls')
-		elif os_name == "Linux": os.system('clear')
-		else: print "something wrong"
-		
-		print "Current number of tweets: " + str(self.num_tweets)
-		#print "Current file size: " + str(os.path.getsize(filepath)/(1000000)) + "mb"
-		print "Time elapsed: " + str(int(time.time()-self.start_time)/(60*60)) + "h " + str((int(time.time() - self.start_time)%3600)/60) + "m"
-		try:
-			print "Moving tweet frequency average (SMA) for past 10 minutes: " + str(sum(self.sma_tweets)/float(np.count_nonzero(self.sma_tweets)))
+    Attributes:
+        total_tweets        The total number of tweets the crawler has collected
+        tweets_per_second   The number of tweets received in the previous second
+        start_time          Time when the crawler started
+        stream              The Twitter stream where the crawler will get the tweets from
+        file                The current GzipFile the crawler is writing to (changes every hour)
+        sma_tweets          Queue to calculate Smoothed Moving Average of number of tweets collected
+    """
 
-		except:
-			print "Moving tweet frequency average (SMA) for past 10 minutes: 0"
-		print "\nCtrl+C to stop crawling"
+    total_tweets = 0
+    tweets_per_second = 0
+    start_time = datetime.time()
+    stream = twitter.TwitterStream()
+    file = gzip.GzipFile
+    sma_tweets = deque()
+
+    def __init__(self, sma_length=10):
+        """ Initializes class attributes
+        :param sma_length: Duration (in minutes) of SMA sample size
+        """
+        # Extends the SMA Tweets queue to accommodate the sample size
+        self.sma_tweets.extend([0] * (60 * sma_length))
+
+        # Initializes a Twitter Stream
+        twitter_api = init_twitter_api()
+        self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
+            .statuses.sample(language='en')
+
+        # Initializes the file the crawler is going to write to
+        self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
+
+    def start(self):
+        """ Main function to start the collection of tweets """
+        # Mark start time
+        self.start_time = datetime.datetime.now()
+
+        # Initial call to print_status, after which it will loop every 1s
+        self.print_status()
+
+        # Initial call to update_sma, after which it will loop every 1s
+        self.update_sma()
+
+        # Iterate tweets
+        try:
+            for tweet in self.stream:
+                # Update counters
+                self.total_tweets += 1
+                self.tweets_per_second += 1
+
+                # Write tweet to file
+                self.file.write(json.dumps(tweet) + '\r\n')
+
+                # If the current file name is outdated
+                if self.file.name != time.strftime('%d-%m-%Y_%H') + '.json.gz':
+                    self.change_file()
+        except StopIteration:
+            print "Stream stopped unexpectedly."
+            self.stop()
+
+    def stop(self):
+        """ Do cleanup work """
+        self.file.close()
+        print 'Crawling stopped/interrupted'
+
+    def update_sma(self):
+        """ Update the SMA queue with the number of tweets
+            received in the last second
+        """
+        # Call update_sma again 1s from now
+        t = threading.Timer(1.0, self.update_sma)
+        t.daemon = True
+        t.start()
+
+        # Remove the oldest record and add the latest record
+        self.sma_tweets.pop()
+        self.sma_tweets.appendleft(self.tweets_per_second)
+
+        # Reset counter
+        self.tweets_per_second = 0
+
+    def print_status(self):
+        """ Print the current status of the crawler to the terminal every second
+        """
+        # Call print_status again 1s from now
+        t = threading.Timer(1.0, self.print_status)
+        t.daemon = True
+        t.start()
+
+        # Attempt to clear the terminal
+        os_name = platform.system()
+        if os_name == "Windows":
+            os.system('cls')
+        elif os_name == "Linux":
+            os.system('clear')
+        else:
+            print "\n" * 100
+
+        # Calculates some key statistics
+        elapsed_time = datetime.datetime.now() - self.start_time
+        if elapsed_time.total_seconds() > len(self.sma_tweets):
+            sma = sum(self.sma_tweets) / float(np.count_nonzero(self.sma_tweets))
+        else:
+            sma = 0
+
+        status = {
+            'total_tweets': self.total_tweets,
+            'duration': int(elapsed_time.total_seconds()),
+            'sma': sma,
+            'file_path': self.file.name,
+            'file_size': os.path.getsize(self.file.name)
+        }
+
+        print status
 
 
-def oauth_login(): #authenticate w twitter API
-	CONSUMER_KEY = ck
-	CONSUMER_SECRET = cs
-	OAUTH_TOKEN = ot
-	OAUTH_TOKEN_SECRET = ots
+    def change_file(self):
+        """ Change the file the crawler is writing to
+            and starts processing previous hour's file
+        """
+        if self.file.name != time.strftime('%d-%m-%Y_%H') + '.json.gz':
+            # Sets the key of this file
+            key = self.file.name.split('.')[0]
 
-	auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET, CONSUMER_KEY, CONSUMER_SECRET)
-	twitter_api = twitter.Twitter(auth=auth)
-	return twitter_api
+            # Starts the upload
+            t = threading.Thread(target=upload_file, args=(self.file.name, key))
+            t.daemon = True
+            t.start()
 
-def decompress(filedate):
-	if not os.path.exists('decompressed-tweets'):
-		os.makedirs('decompressed-tweets')
-	f = open(os.path.join('decompressed-tweets', filedate + '.bz2') ,'w')
-	
-	indecompress = bz2.BZ2Decompressor()
-	compressedfile = open(os.path.join('raw-tweets', filedate + '.bz2') ,'r')
-	for line in compressedfile:
-		f.write(indecompress.decompress(line))
+            # Change file
+            self.file.close()
+            self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
+
 def trends():
-	datetime_ = str(datetime.datetime.now())[:-7]
-	if not os.path.exists('trends'):
-		os.makedirs('trends')
-	f = open(os.path.join('trends',datetime_ + ' ' + 'sg-trends'), 'w')
-	def twitter_trends(twitter_api, woe_id):
-		return twitter_api.trends.place(_id = woe_id)
-	twitter_api = oauth_login()
-	SG_WOE_ID = 1062617
-	sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
-	f.write(json.dumps(sg_trends, indent = 1))
+    datetime_ = str(datetime.datetime.now())[:-7]
 
+    if not os.path.exists('trends'):
+        os.makedirs('trends')
 
-#this function is purely for convenience, you know.
-def time_change(t, units):
-	# use: time_change(1, 'minute')
-	# returns 60
-	if units == 'minute':
-		return t * 60
-	elif units == 'hour':
-		return t * 60 * 60
-	elif units == 'day':
-		return t * 60 * 60 * 24
-	else:
-		raise ValueError("Typo in the units?")
+    f = open(os.path.join('trends',datetime_ + ' ' + 'sg-trends'), 'w')
 
-if __name__ == "__main__":
-	main()
-	#print load_from_mongo('2015-03-2022', 'universe')
-	#decompress()
-	#trends() 'universe')
+    def twitter_trends(twitter_api, woe_id):
+        return twitter_api.trends.place(_id = woe_id)
 
+    twitter_api = oauth_login()
+    
+    SG_WOE_ID = 1062617
+    sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
+    f.write(json.dumps(sg_trends, indent = 1))
+    
+if __name__ == '__main__':
+    main()
