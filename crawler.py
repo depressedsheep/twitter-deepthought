@@ -8,6 +8,7 @@ import threading
 import logging
 import pprint
 from collections import deque
+import numpy as np
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from config import ck, cs, ot, ots, boto_access, boto_secret, public_dir
@@ -54,6 +55,9 @@ def upload_file(file_path, key, bucket_name='twitter-deepthought'):
     k.key = key
     try:
         k.set_contents_from_filename(file_path)
+
+        # Delete file after upload
+        os.remove(file_path)
     except:
         pass
 
@@ -208,8 +212,6 @@ class Crawler(object):
             # Change file
             self.file.close()
             self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
-
-            # Delete previous file
 
 
 if __name__ == '__main__':
