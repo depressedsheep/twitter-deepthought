@@ -8,7 +8,6 @@ import threading
 import logging
 import pprint
 from collections import deque
-import numpy as np
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from config import ck, cs, ot, ots, boto_access, boto_secret, public_dir
