@@ -6,12 +6,14 @@ import twitter
 import gzip
 import threading
 import platform
+import sys
 from collections import deque
-import numpy as np
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from config import ck, cs, ot, ots, boto_access, boto_secret
-
+from pyqtgraph.Qt import QtGui, QtCore
+import numpy as np
+import pyqtgraph as pg
 CONSUMER_KEY = ck
 CONSUMER_SECRET = cs
 OAUTH_TOKEN = ot
@@ -21,6 +23,7 @@ OAUTH_TOKEN_SECRET = ots
 def main():
     # Run crawler
     c = Crawler()
+
     try:
         c.start()
     except KeyboardInterrupt:
@@ -56,7 +59,30 @@ def upload_file(file_path, key, bucket_name='twitter-deepthought'):
         k.set_contents_from_filename(file_path)
     except:
         pass
-
+class plot(object):
+	def __init__(self):
+		app = QtGui.QApplication([])
+		win = pg.GraphicsWindow(title="Twitter Crawler Plot")
+		win.resize(1000, 600)
+		win.setWindowTitle('SMA')
+		pg.setConfigOptions(antialias = True)
+		self.p = win.addPlot(title = "SMA")
+		self.curve = self.p.plot(pen = 'y')
+		self.data = np.random.normal(size = 1000)		
+		self.ptr = 0
+		t = threading.Thread(target = self.start_plot)
+		t.daemon = True
+		t.start()
+		pg.QtGui.QApplication.exec_()
+	def start_plot(self):
+		while True:
+			self.update_plot()
+			time.sleep(1.0)
+	def update_plot(self):
+		self.curve.setData(np.random.normal(size = 1000))
+		if self.ptr ==0:
+			self.p.enableAutoRange('xy', False)
+		self.ptr += 1
 
 class Crawler(object):
     """ Accepts Twitter tweet stream and save them hourly
@@ -99,7 +125,6 @@ class Crawler(object):
 
         # Initial call to print_status, after which it will loop every 1s
         self.print_status()
-
         # Initial call to update_sma, after which it will loop every 1s
         self.update_sma()
 
@@ -133,7 +158,7 @@ class Crawler(object):
         t = threading.Timer(1.0, self.update_sma)
         t.daemon = True
         t.start()
-
+        #g = plot()
         # Remove the oldest record and add the latest record
         self.sma_tweets.pop()
         self.sma_tweets.appendleft(self.tweets_per_second)
@@ -141,6 +166,7 @@ class Crawler(object):
         # Reset counter
         self.tweets_per_second = 0
 
+   
     def print_status(self):
         """ Print the current status of the crawler to the terminal every second
         """
@@ -151,12 +177,12 @@ class Crawler(object):
 
         # Attempt to clear the terminal
         os_name = platform.system()
-        if os_name == "Windows":
+      	""" if os_name == "Windows":
             os.system('cls')
         elif os_name == "Linux":
             os.system('clear')
         else:
-            print "\n" * 100
+            print "\n" * 100"""
 
         # Calculates some key statistics
         elapsed_time = datetime.datetime.now() - self.start_time
@@ -193,6 +219,7 @@ class Crawler(object):
             self.file.close()
             self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
 
+
 def trends():
     datetime_ = str(datetime.datetime.now())[:-7]
 
@@ -211,4 +238,9 @@ def trends():
     f.write(json.dumps(sg_trends, indent = 1))
     
 if __name__ == '__main__':
-    main()
+	t = threading.Thread(target = main)
+	t.daemon = True
+	t.start()
+	g = plot()
+
+
