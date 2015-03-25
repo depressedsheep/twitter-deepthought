@@ -1,9 +1,4 @@
 config.py
-.idea/.name
-.idea/encodings.xml
-.idea/scopes/scope_settings.xml
-.idea/vcs.xml
-.idea/workspace.xml
-.idea/modules.xml
-.idea/twitter-deepthought.iml
-.idea/misc.xml
+.idea*
+25-03-2015_17.json.gz
+config.pyc

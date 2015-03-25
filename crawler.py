@@ -71,6 +71,7 @@ class Crawler(object):
         stream              The Twitter stream where the crawler will get the tweets from
         file                The current GzipFile the crawler is writing to (changes every hour)
         sma_tweets          Queue to calculate Smoothed Moving Average of number of tweets collected
+        tick                The number of milliseconds for each tick/update
     """
 
     total_tweets = 0
@@ -79,6 +80,7 @@ class Crawler(object):
     stream = twitter.TwitterStream()
     file = gzip.GzipFile
     sma_tweets = deque()
+    tick = 1000
 
     def __init__(self, sma_length=10):
         """ Initializes class attributes
@@ -110,8 +112,8 @@ class Crawler(object):
         # Mark start time
         self.start_time = datetime.datetime.now()
 
-        # Initial call to print_status, after which it will loop every 1s
-        self.update_status()
+        # Initial call to tick, after which it will loop every tick
+        self.tick()
 
         # Initial call to update_sma, after which it will loop every 1s
         self.update_sma()
@@ -138,6 +140,18 @@ class Crawler(object):
         self.file.close()
         print 'Crawling stopped/interrupted'
 
+    def tick(self):
+        """ Functions called every second/tick
+            update_sma isn't called as it has to run every second """
+
+        # tick again self.tick ms from now
+        t = threading.Timer(self.tick/1000, self.update_status)
+        t.daemon = True
+        t.start()
+
+        # Update status every tick
+        self.update_status()
+
     def update_sma(self):
         """ Update the SMA queue with the number of tweets
             received in the last second
@@ -162,11 +176,6 @@ class Crawler(object):
         """
         if threading is None:
             return
-
-        # Call print_status again 1s from now
-        t = threading.Timer(0.5, self.update_status)
-        t.daemon = True
-        t.start()
 
         # Calculates some key statistics
         elapsed_time = datetime.datetime.now() - self.start_time
