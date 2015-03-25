@@ -5,12 +5,12 @@ import json
 import twitter
 import gzip
 import threading
-import platform
+import logging
+import pprint
 from collections import deque
-import numpy as np
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
-from config import ck, cs, ot, ots, boto_access, boto_secret
+from config import ck, cs, ot, ots, boto_access, boto_secret, public_dir
 
 CONSUMER_KEY = ck
 CONSUMER_SECRET = cs
@@ -20,7 +20,7 @@ OAUTH_TOKEN_SECRET = ots
 
 def main():
     # Run crawler
-    c = Crawler()
+    c = Crawler(sma_length=1)
     try:
         c.start()
     except KeyboardInterrupt:
@@ -92,13 +92,23 @@ class Crawler(object):
         # Initializes the file the crawler is going to write to
         self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
 
+        # Configure logging
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s: %(message)s',
+            datefmt='%m/%d/%Y %I:%M:%S %p')
+
+        # Clear previous SMA graph
+        with open(public_dir + "sma_graph.txt", 'w') as f:
+            f.write('')
+
     def start(self):
         """ Main function to start the collection of tweets """
         # Mark start time
         self.start_time = datetime.datetime.now()
 
         # Initial call to print_status, after which it will loop every 1s
-        self.print_status()
+        self.update_status()
 
         # Initial call to update_sma, after which it will loop every 1s
         self.update_sma()
@@ -129,6 +139,9 @@ class Crawler(object):
         """ Update the SMA queue with the number of tweets
             received in the last second
         """
+        if threading is None:
+            return
+
         # Call update_sma again 1s from now
         t = threading.Timer(1.0, self.update_sma)
         t.daemon = True
@@ -141,40 +154,43 @@ class Crawler(object):
         # Reset counter
         self.tweets_per_second = 0
 
-    def print_status(self):
-        """ Print the current status of the crawler to the terminal every second
+    def update_status(self):
+        """ Log the current status of the crawler and sends status to frontend
         """
+        if threading is None:
+            return
+
         # Call print_status again 1s from now
-        t = threading.Timer(1.0, self.print_status)
+        t = threading.Timer(0.5, self.update_status)
         t.daemon = True
         t.start()
-
-        # Attempt to clear the terminal
-        os_name = platform.system()
-        if os_name == "Windows":
-            os.system('cls')
-        elif os_name == "Linux":
-            os.system('clear')
-        else:
-            print "\n" * 100
 
         # Calculates some key statistics
         elapsed_time = datetime.datetime.now() - self.start_time
         if elapsed_time.total_seconds() > len(self.sma_tweets):
-            sma = sum(self.sma_tweets) / float(np.count_nonzero(self.sma_tweets))
+            sma = sum(self.sma_tweets) / float(len(self.sma_tweets))
         else:
-            sma = 0
+            sma = 0.0
 
         status = {
             'total_tweets': self.total_tweets,
             'duration': int(elapsed_time.total_seconds()),
-            'sma': sma,
+            'sma': round(sma, 2),
             'file_path': self.file.name,
             'file_size': os.path.getsize(self.file.name)
         }
 
-        print status
+        # Logs to console
+        logging.info("\n" + pprint.pformat(status) + "\n")
 
+        # Update status to front end
+        with open(public_dir + "status.json", 'w') as f:
+            f.write(json.dumps(status))
+
+        # Record SMA for graphing later
+        if int(elapsed_time.total_seconds()) > len(self.sma_tweets):
+            with open(public_dir + "sma_graph.txt", 'ab') as f:
+                f.write("[" + str(status['duration']) + "," + str(status['sma']) + "],")
 
     def change_file(self):
         """ Change the file the crawler is writing to
@@ -193,22 +209,8 @@ class Crawler(object):
             self.file.close()
             self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
 
-def trends():
-    datetime_ = str(datetime.datetime.now())[:-7]
+            # Delete previous file
 
-    if not os.path.exists('trends'):
-        os.makedirs('trends')
 
-    f = open(os.path.join('trends',datetime_ + ' ' + 'sg-trends'), 'w')
-
-    def twitter_trends(twitter_api, woe_id):
-        return twitter_api.trends.place(_id = woe_id)
-
-    twitter_api = oauth_login()
-    
-    SG_WOE_ID = 1062617
-    sg_trends = twitter_trends(twitter_api, SG_WOE_ID)
-    f.write(json.dumps(sg_trends, indent = 1))
-    
 if __name__ == '__main__':
     main()
