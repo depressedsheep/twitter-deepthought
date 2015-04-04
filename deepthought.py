@@ -31,6 +31,7 @@ def main():
 	d.create_dict(force = False)
 	d.create_corpus(force = False)
 	d.create_tfidf(force = True)
+	d.create_lsi(force = True)
 #
 # this part assumes loading from boto
 class deepthought(object):
@@ -46,7 +47,8 @@ class deepthought(object):
 		'dump': os.path.join('thinking', 'braindump'),
 		'dict': os.path.join('thinking', 'braindict'),
 		'corp': os.path.join('thinking', 'braincorp'),
-		'tfidf': os.path.join('thinking', 'braintfidf')
+		'tfidf': os.path.join('thinking', 'braintfidf'),
+		'lsi': os.path.join('thinking','brainlsi')
 		}
 	def ensure_dir(self,f):
 		if not os.path.exists(f):
@@ -87,7 +89,7 @@ class deepthought(object):
 				text = self.clean(text) #returned as a list
 				self.f_text.write(' '.join(text).encode('ascii','ignore') + '\n')
 		self.f_text.close()
-
+		logging.info("Text cleaned.")
 	def clean(self, rawtext):
 		tl = unicode(rawtext.lower()).split(' ')
 		tl = self.strip_emojis(tl)
@@ -164,23 +166,27 @@ class deepthought(object):
 	def corpus_creator(self):
 		self.f_dict = open(os.path.join(self.dirs['dict'], self.key),'rb+') #dictionary
 		self.f_text = open(os.path.join(self.dirs['dump'], self.key),'rb+')
-		self.f_corp = open(os.path.join(self.dirs['corp'], self.key), 'w') #vector corpus
+		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'w') #vector corpus
+		#print type(self.key + '.mm')
 		self.dict = pickle.load(self.f_dict)
-		while True:
+		corpora.MmCorpus.serialize(os.path.join(self.dirs['corp'], self.key + '.mm'), [self.dict.doc2bow(line.split(' ')) for line in self.f_text])
+		"""while True:
 			text = self.f_text.readline()
 			if self.f_text.readline() == '':
 				logging.info("EOF, no more lines to read.")
 				break
 			vector = self.dict.doc2bow(text.split(' ')) #vector is an ordinary python list
-			pickle.dump(vector, self.f_corp)			
-		logging.info("Corpus created, and written into thinking/braincorpus/[KEY_NAME]")
+			corpora.MmCorpus.serialize(os.path.join(self.dirs['corp'], self.key + '.mm'), [vector])
+			"""
+			#pickle.dump(vector, self.f_corp)			
+		logging.info("Corpus created, and written into thinking/braincorpus/[KEY_NAME].mm in the Market Matrix format.")
 		self.f_corp.close()
 		self.f_text.close()
 		self.f_dict.close()
 	def create_tfidf(self, force = False):
 		logging.info("Attempting to create tf-idf model.")
 		self.ensure_dir(self.dirs['tfidf'])
-		if not os.path.exists(os.path.join(self.dirs['tfidf'], self.key)):
+		if not os.path.exists(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model')):
 			self.tfidf_creator()
 		else:
 			if force == True:
@@ -189,21 +195,70 @@ class deepthought(object):
 			else:
 				logging.info("Tf-idf model already created. Set force to True to create again.")
 	def tfidf_creator(self):
-		self.f_tfidf = open(os.path.join(self.dirs['tfidf'], self.key), 'w')
-		self.tfidf = models.TfidfModel(dictionary = pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
-		print self.tfidf
+		#self.f_tfidf = open(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'), 'w')
+
 		logging.info("Tf-idf model initialised.")
 		logging.info("Attempting to convert current corpus to the Tf-idf model...")
-		self.f_corp = open(os.path.join(self.dirs['corp'], self.key), 'r')
-		while True:
+		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+		self.corpus = corpora.MmCorpus(self.f_corp)
+		#print self.corpus
+
+		self.tfidf = models.TfidfModel(corpus = self.corpus, dictionary = pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
+		self.corpus_tfidf = self.tfidf[self.corpus]
+		print self.tfidf
+		self.tfidf.save(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'))
+
+		"""while True:
 			try:
 				vector = pickle.load(self.f_corp)
 				pickle.dump(vector, self.f_tfidf)
 			except (EOFError):
 				logging.info("Reached EOF of corpus, exiting.")
+				break"""
+		
+		logging.info("Tf-idf model created, saved in tfidf_model format.")
+		#self.f_tfidf.close()
+	def create_lsi(self, force = False):
+		#
+		# Current approach: generate a seperate LSI / LSA for each time block, then compare over time
+		# After initial development and for research purposes, consider collecting a few days worth of data, before creating a 'master' dictionary and 'corpus' to create a LSI/LSA model for topic-modelling 
+		# In that case, ensure memory efficiency (i.e. not loading large chunks of data into memory), and possibly use a different organisational structure
+		# Currently not very sure, but I'm guessing you'd add an option into the vector generator function to use the 'master' dict, and then add into the LSA structure
+		#
+		self.ensure_dir(self.dirs['lsi'])
+		if os.path.exists(os.path.join(self.dirs['lsi'], self.key + '.lsi')):
+			if force == True:
+				logging.info("Forced to create LSI/LSA model again.")
+				self.lsi_creator()
+			else:
+				logging.info("LSI/LSA model already created. Set force to True to create LSI model again.")
+				pass
+		else:
+			self.lsi_creator()
+	def lsi_creator(self, document_size = 1000):
+		#self.f_tfidf = self.f_tfidf = open(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'), 'r')
+		self.tfidf.load(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'))
+		print self.tfidf
+		self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
+		self.lsi = models.LsiModel(self.corpus_tfidf, id2word = self.dict, num_topics = 200)
+		self.corpus_lsi = lsi[self.corpus_tfidf] #double wrapper over the original corpus
+		self.lsi.print_topics(5)
+		"""while True:
+			try:
+				vectors = []
+				for a in xrange(document_size):
+					try:
+						vectors.append(pickle.load(self.f_tfidf))
+					except:
+						break
+				self.lsi.add_documents(vectors)
+			except (EOFError):
+				logging.info("Reached EOF of Tf-idf vectors, exiting.")
 				break
-			
-		logging.info("Tf-idf model created.")
-
+		"""
+		#self.f_lsi = open(os.path.join(self.dirs['lsi'], self.key + '.lsi'), 'w')
+		self.lsi.save(os.path.join(self.dirs['lsi'], self.key + '.lsi'))
+		#pickle.dump(self.lsi, self.t_lsi)
+		logging.info("LSA model created.")
 if __name__ == '__main__':
 	main()
