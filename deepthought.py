@@ -45,10 +45,15 @@ class deepthought(object):
 		self.dirs = {
 		'load':'thinking',
 		'dump': os.path.join('thinking', 'braindump'),
-		'dict': os.path.join('thinking', 'braindict'),
+		'dict': os.path.join('thinking', 'braindict'), #the last three are kind of redundant, will clear soon. were meant for pickling.
 		'corp': os.path.join('thinking', 'braincorp'),
 		'tfidf': os.path.join('thinking', 'braintfidf'),
 		'lsi': os.path.join('thinking','brainlsi')
+		}
+		self.fp = {
+		'lsi': os.path.join(self.dirs['lsi'], self.key + '.lsi'),
+		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
+		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}
 	def ensure_dir(self,f):
 		if not os.path.exists(f):
@@ -154,7 +159,7 @@ class deepthought(object):
 		logging.info("Attempting to create corpus...")
 		self.ensure_dir(self.dirs['corp'])
 
-		if os.path.exists(os.path.join(self.dirs['corp'], self.key)):
+		if os.path.exists(self.fp['corp']):
 			if force == False:
 				logging.info("Corpus exists already. Set force to True to create it again.")
 			else:
@@ -166,21 +171,10 @@ class deepthought(object):
 	def corpus_creator(self):
 		self.f_dict = open(os.path.join(self.dirs['dict'], self.key),'rb+') #dictionary
 		self.f_text = open(os.path.join(self.dirs['dump'], self.key),'rb+')
-		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'w') #vector corpus
-		#print type(self.key + '.mm')
 		self.dict = pickle.load(self.f_dict)
-		corpora.MmCorpus.serialize(os.path.join(self.dirs['corp'], self.key + '.mm'), [self.dict.doc2bow(line.split(' ')) for line in self.f_text])
-		"""while True:
-			text = self.f_text.readline()
-			if self.f_text.readline() == '':
-				logging.info("EOF, no more lines to read.")
-				break
-			vector = self.dict.doc2bow(text.split(' ')) #vector is an ordinary python list
-			corpora.MmCorpus.serialize(os.path.join(self.dirs['corp'], self.key + '.mm'), [vector])
-			"""
-			#pickle.dump(vector, self.f_corp)			
+		corpora.MmCorpus.serialize(self.fp['corp'], [self.dict.doc2bow(line.split(' ')) for line in self.f_text])
+	
 		logging.info("Corpus created, and written into thinking/braincorpus/[KEY_NAME].mm in the Market Matrix format.")
-		self.f_corp.close()
 		self.f_text.close()
 		self.f_dict.close()
 	def create_tfidf(self, force = False):
@@ -195,8 +189,6 @@ class deepthought(object):
 			else:
 				logging.info("Tf-idf model already created. Set force to True to create again.")
 	def tfidf_creator(self):
-		#self.f_tfidf = open(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'), 'w')
-
 		logging.info("Tf-idf model initialised.")
 		logging.info("Attempting to convert current corpus to the Tf-idf model...")
 		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
@@ -206,18 +198,9 @@ class deepthought(object):
 		self.tfidf = models.TfidfModel(corpus = self.corpus, dictionary = pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
 		self.corpus_tfidf = self.tfidf[self.corpus]
 		print self.tfidf
-		self.tfidf.save(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'))
-
-		"""while True:
-			try:
-				vector = pickle.load(self.f_corp)
-				pickle.dump(vector, self.f_tfidf)
-			except (EOFError):
-				logging.info("Reached EOF of corpus, exiting.")
-				break"""
-		
+		self.tfidf.save(self.fp['tfidf'])
 		logging.info("Tf-idf model created, saved in tfidf_model format.")
-		#self.f_tfidf.close()
+
 	def create_lsi(self, force = False):
 		#
 		# Current approach: generate a seperate LSI / LSA for each time block, then compare over time
@@ -236,29 +219,16 @@ class deepthought(object):
 		else:
 			self.lsi_creator()
 	def lsi_creator(self, document_size = 1000):
-		#self.f_tfidf = self.f_tfidf = open(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'), 'r')
-		self.tfidf.load(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'))
+		self.tfidf.load(self.fp['tfidf'])
 		print self.tfidf
 		self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
 		self.lsi = models.LsiModel(self.corpus_tfidf, id2word = self.dict, num_topics = 200)
 		self.corpus_lsi = self.lsi[self.corpus_tfidf] #double wrapper over the original corpus
 		self.lsi.print_topics(5)
-		"""while True:
-			try:
-				vectors = []
-				for a in xrange(document_size):
-					try:
-						vectors.append(pickle.load(self.f_tfidf))
-					except:
-						break
-				self.lsi.add_documents(vectors)
-			except (EOFError):
-				logging.info("Reached EOF of Tf-idf vectors, exiting.")
-				break
-		"""
-		#self.f_lsi = open(os.path.join(self.dirs['lsi'], self.key + '.lsi'), 'w')
-		self.lsi.save(os.path.join(self.dirs['lsi'], self.key + '.lsi'))
-		#pickle.dump(self.lsi, self.t_lsi)
+		self.lsi.save(self.fp['lsi'])
 		logging.info("LSA model created.")
+	def display_lsi(self):
+		self.lsi.load(self.fp['lsi'])
+		lsi.print_topics(10)
 if __name__ == '__main__':
 	main()
