@@ -25,14 +25,18 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 stop = stopwords.words('english')
 
 def main():
-	d = deepthought('31-03-2015_00')
-	d.load('31-03-2015_00')
+	t = '31-03-2015_00'
+	d = deepthought(t)
+	d.load(t) #key from boto
+	#
+	# Setting force as True creates the thing again even though it might have already been generated and saved previously
+	#
 	d.clean_text(force = False)
 	d.create_dict(force = False)
 	d.create_corpus(force = False)
 	d.create_tfidf(force = False)
 	d.create_lsi(force = False)
-	d.display_lsi(n = 10)
+	d.display_lsi(n = 10) #n being number of topics to display
 #
 # this part assumes loading from boto
 class deepthought(object):
@@ -42,7 +46,7 @@ class deepthought(object):
 		self.key = key
 		self.k = Key(self.bucket)
 		self.k.key = self.key
-		self.t_stop = ['rt', '#', 'http', '@']	
+		self.t_stop = ['rt', '#', 'http', '@'] #this is an arbitary stop list, and will change depending on analysis goals
 		self.dirs = {
 		'load':'thinking',
 		'dump': os.path.join('thinking', 'braindump'),
@@ -56,7 +60,7 @@ class deepthought(object):
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}
-	def ensure_dir(self,f):
+	def ensure_dir(self,f): 
 		if not os.path.exists(f):
 			os.makedirs(f)
 	def print_list(self):
@@ -97,12 +101,11 @@ class deepthought(object):
 		self.f_text.close()
 		logging.info("Text cleaned.")
 	def clean(self, rawtext):
-		tl = unicode(rawtext.lower()).split(' ')
+		tl = unicode(rawtext.lower()).split(' ') #convert to unicode so regex, which removes emojis can work
 		tl = self.strip_emojis(tl)
-		tl = filter(lambda w: (not w in self.t_stop), tl)
-		tl = filter(lambda w: (not w in stop), tl)
-		tl = map(self.strip_escape ,tl)
-		tl = filter(self.strip_others, tl)		
+		tl = filter(lambda w: (not w in stop), tl) #apply nltk stop list for normal, useless words
+		tl = map(self.strip_escape ,tl) #remove escape characters like \n
+		tl = filter(self.strip_others, tl) 
 		return tl
 
 	def strip_emojis(self,tl):
@@ -190,7 +193,6 @@ class deepthought(object):
 			else:
 				logging.info("Tf-idf model already created. Set force to True to create again.")
 	def tfidf_creator(self):
-		logging.info("Tf-idf model initialised.")
 		logging.info("Attempting to convert current corpus to the Tf-idf model...")
 		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
 		self.corpus = corpora.MmCorpus(self.f_corp)
@@ -200,6 +202,7 @@ class deepthought(object):
 		self.corpus_tfidf = self.tfidf[self.corpus]
 		print self.tfidf
 		self.tfidf.save(self.fp['tfidf'])
+
 		logging.info("Tf-idf model created, saved in tfidf_model format.")
 
 	def create_lsi(self, force = False):
