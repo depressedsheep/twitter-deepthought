@@ -27,9 +27,9 @@ stop = stopwords.words('english')
 def main():
 	d = deepthought('31-03-2015_00')
 	d.load('31-03-2015_00')
-	d.clean_text(force_clean = False)
-	d.create_dict(force_dict = False)
-	d.create_corpus(force_corpus = True)
+	d.clean_text(force = True)
+	d.create_dict(force = True)
+	d.create_corpus(force = True)
 #
 # this part assumes loading from boto
 class deepthought(object):
@@ -40,85 +40,44 @@ class deepthought(object):
 		self.k = Key(self.bucket)
 		self.k.key = self.key
 		self.t_stop = ['rt', '#', 'http', '@']	
-	
+		self.dirs = {
+		'load':'thinking',
+		'dump': os.path.join('thinking', 'braindump'),
+		'dict': os.path.join('thinking', 'braindict'),
+		'corp': os.path.join('thinking', 'braincorp')
+		}
+	def ensure_dir(self,f):
+		if not os.path.exists(f):
+			os.makedirs(f)
 	def print_list(self):
 		print "Key list: "
 		for z in self.bucket.list():
 			print z.name
 	def load(self,savepath): 
-		#load from boto here and 
-		if not os.path.exists('thinking'):
-			os.makedirs('thinking')
+		#load from boto here 
+		self.ensure_dir(self.dirs['load'])
 		if not os.path.exists(os.path.join('thinking', savepath + '.gz')):
+			print "Raw compressed file does not existing. Downloading."
 			print self.key
 			self.k.get_contents_to_filename(os.path.join('thinking',savepath + '.gz'))
 		self.f = gzip.open(os.path.join('thinking',savepath+'.gz'), 'rb')
 		print self.f
 		a = json.loads(self.f.readline())
 		#print a['text']
-	def create_dict(self, force_dict = False):
-		print "Attempting to create dictionary..."
-		self.f_text = open('.braindump', 'r')
-		if os.path.exists('.braindict'):
-			if force_dict == False:
-				print "Dictionary already exists. Set force_dict to True to refresh it."
-			else:
-				print "Forced to create dictionary."
-				self.dict_creator()
-		else:
-			self.dict_creator()
-	def dict_creator(self):
-		self.dict = corpora.Dictionary(line[:-1].lower().split() for line in self.f_text)
-		once_ids = [tokenid for tokenid,docfreq in self.dict.iteritems() if docfreq == 1]
-		self.dict.filter_tokens(once_ids)
-		self.dict.compactify()
-		pickle.dump(self.dict, open('.braindict', 'w')) #this is a dump of the dictionary
-		print self.dict
-		self.f_text.close()
-		print "Dictionary created."
-	def create_corpus(self, force_corpus = False):
-		print "Attempting to create corpus..."
-		if os.path.exists('.braincorpus'):
-			if force_corpus == False:
-				print ".braincorpus exists already. Set force_corpus as True to create it again."
-			else:
-				"Forced to create corpus."
-				self.corpus_creator()
-		else:
-			self.corpus_creator()
-	def corpus_creator(self):
-		self.f_dict = open('.braindict', 'rb+') #dictionary
-		self.f_text = open('.braindump','rb+')
-		self.f_corp = open('.braincorpus', 'w') #vector corpus
-		self.dict = pickle.load(self.f_dict)
-		c = 0
-		while True:
-			c += 1
-			#print c
-			text = self.f_text.readline()
-			if self.f_text.readline() == '':
-				print "EOF, no more lines to read."
-				break
-			vector = self.dict.doc2bow(text.split(' '))
-			if c == 5:
-				print type(vector)
-			self.f_corp.write(str(vector) + "\n")
-
-			
-		print "Corpus created, and written onto .braincorpus"
-		
-	def clean_text(self, force_clean = False): #generate cleaned text
+	def clean_text(self, force = False): #generate cleaned text
 		print "Attempting to clean text..."
-		if os.path.exists('.braindump'):
-			if not force_clean:
+		self.ensure_dir(self.dirs['dump'])
+		if os.path.exists(os.path.join(self.dirs['dump'], self.key)):
+			if not force:
+				print "Text already cleaned. Set force to True to force clean."
 				pass
 			else: 
-				"Forced to clean text."
+				print "Forced to clean text."
 				self.cleaner()
 		else:
-				self.cleaner()
+			self.cleaner()
 	def cleaner(self):
-		self.f_text = open('.braindump', 'wb')
+		self.f_text = open(os.path.join(self.dirs['dump'], self.key), 'wb')
 		for tweet in self.f:
 				tweet = json.loads(tweet)
 				text = tweet['text']
@@ -131,12 +90,13 @@ class deepthought(object):
 		tl = filter(lambda w: (not w in self.t_stop), tl)
 		tl = filter(lambda w: (not w in stop), tl)
 		tl = map(self.strip_escape ,tl)
-		tl = filter(self.strip_others, tl)
-		
+		tl = filter(self.strip_others, tl)		
 		return tl
+
 	def strip_emojis(self,tl):
 		myre = re.compile(u'['u'\U0001f300-\U0001ffff'u'\U0001f600-\U0001f64f'u'\U0001f680-\U0001f6ff'u'\u2600-\u26ff\u2700-\u27bf]+', re.UNICODE)
 		return myre.sub('', ' '.join(tl)).split(' ')
+
 	def strip_escape(self, text):
 		while True:
 			if text[:1] == '\n':
@@ -144,6 +104,7 @@ class deepthought(object):
 			else:
 				break
 		return text
+
 	def strip_others(self, text):
 		#
 		# For now, remove all hashtags and links because the focus now is going to be only on the words.
@@ -153,6 +114,65 @@ class deepthought(object):
 				#print text
 				return False
 		return True
+
+	def create_dict(self, force = False):
+		print "Attempting to create dictionary..."
+		self.ensure_dir(self.dirs['dict'])
+		self.f_text = open(os.path.join(self.dirs['dump'],self.key),'r')
+		if os.path.exists(os.path.join(self.dirs['dict'],self.key)):
+			if force == False:
+				print "Dictionary already exists. Set force to True to refresh it."
+			else:
+				print "Forced to create dictionary."
+				self.dict_creator()
+		else:
+			self.dict_creator()
+
+	def dict_creator(self):
+		self.f_dict = open(os.path.join(self.dirs['dict'], self.key), 'w')
+
+		self.dict = corpora.Dictionary(line[:-1].lower().split() for line in self.f_text)
+		once_ids = [tokenid for tokenid,docfreq in self.dict.iteritems() if docfreq == 1]
+		self.dict.filter_tokens(once_ids)
+		self.dict.compactify()
+
+		pickle.dump(self.dict, self.f_dict) #this is a dump of the dictionary
+		print self.dict
+
+		self.f_text.close()
+		self.f_dict.close()
+
+		print "Dictionary created."
+
+	def create_corpus(self, force = False):
+		print "Attempting to create corpus..."
+		self.ensure_dir(self.dirs['corp'])
+
+		if os.path.exists(os.path.join(self.dirs['corp'], self.key)):
+			if force == False:
+				print ".braincorpus exists already. Set force to True to create it again."
+			else:
+				"Forced to create corpus."
+				self.corpus_creator()
+		else:
+			self.corpus_creator()
+
+	def corpus_creator(self):
+		self.f_dict = open(os.path.join(self.dirs['dict'], self.key),'rb+') #dictionary
+		self.f_text = open(os.path.join(self.dirs['dump'], self.key),'rb+')
+		self.f_corp = open(os.path.join(self.dirs['corp'], self.key), 'w') #vector corpus
+		self.dict = pickle.load(self.f_dict)
+		c = 0
+		while True:
+			c += 1
+			#print c
+			text = self.f_text.readline()
+			if self.f_text.readline() == '':
+				print "EOF, no more lines to read."
+				break
+			vector = self.dict.doc2bow(text.split(' ')) #vector is an ordinary python list
+			pickle.dump(vector, self.f_corp)			
+		print "Corpus created, and written into thinking/braincorpus/[KEY_NAME]"	
 
 
 if __name__ == '__main__':
