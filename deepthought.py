@@ -32,6 +32,7 @@ def main():
 	d.create_corpus(force = False)
 	d.create_tfidf(force = False)
 	d.create_lsi(force = False)
+	d.display_lsi(n = 10)
 #
 # this part assumes loading from boto
 class deepthought(object):
@@ -209,7 +210,7 @@ class deepthought(object):
 		# Currently not very sure, but I'm guessing you'd add an option into the vector generator function to use the 'master' dict, and then add into the LSA structure
 		#
 		self.ensure_dir(self.dirs['lsi'])
-		if os.path.exists(os.path.join(self.dirs['lsi'], self.key + '.lsi')):
+		if os.path.exists(self.fp['lsi']):
 			if force == True:
 				logging.info("Forced to create LSI/LSA model again.")
 				self.lsi_creator()
@@ -227,8 +228,8 @@ class deepthought(object):
 		self.lsi.print_topics(5)
 		self.lsi.save(self.fp['lsi'])
 		logging.info("LSA model created.")
-	def display_lsi(self):
-		self.lsi.load(self.fp['lsi'])
-		self.lsi.print_topics(10)
+	def display_lsi(self, n = 10):
+		self.lsi = models.LsiModel.load(self.fp['lsi'])
+		self.lsi.print_topics(n)
 if __name__ == '__main__':
 	main()
