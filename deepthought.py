@@ -30,8 +30,8 @@ def main():
 	d.clean_text(force = False)
 	d.create_dict(force = False)
 	d.create_corpus(force = False)
-	d.create_tfidf(force = True)
-	d.create_lsi(force = True)
+	d.create_tfidf(force = False)
+	d.create_lsi(force = False)
 #
 # this part assumes loading from boto
 class deepthought(object):
@@ -229,6 +229,6 @@ class deepthought(object):
 		logging.info("LSA model created.")
 	def display_lsi(self):
 		self.lsi.load(self.fp['lsi'])
-		lsi.print_topics(10)
+		self.lsi.print_topics(10)
 if __name__ == '__main__':
 	main()
