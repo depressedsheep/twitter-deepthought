@@ -241,7 +241,7 @@ class deepthought(object):
 		print self.tfidf
 		self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
 		self.lsi = models.LsiModel(self.corpus_tfidf, id2word = self.dict, num_topics = 200)
-		self.corpus_lsi = lsi[self.corpus_tfidf] #double wrapper over the original corpus
+		self.corpus_lsi = self.lsi[self.corpus_tfidf] #double wrapper over the original corpus
 		self.lsi.print_topics(5)
 		"""while True:
 			try:
