@@ -2,11 +2,17 @@
 # Main analysis module for compressed files. Imports crawler.py and aims to define functions 
 # to parse and analyse the tweets in various ways, most probably with gensim
 # 
-# Goals
+# LOG
+# Completed:
+# ----------
 # - TF-IDF vectors
 # - Create a LSA model and update it at every time interval
-# - Figure out how to run this concurrently with crawler.py
 #
+# To-do:
+# ------
+# - Figure out how to run this concurrently with crawler.py
+# - Decide on size of LSA
+# 
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from gensim import corpora, models, similarities
@@ -21,23 +27,45 @@ import re
 import cPickle as pickle #i don't care even if cPickle is much slower than alternatives like thrift or messagepack; i'm trying to get something done here
 import base64
 import logging
-logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
+
 stop = stopwords.words('english')
 
 def main():
 	t = '31-03-2015_00'
-	d = deepthought(t)
-	d.load(t) #key from boto
-	#
-	# Setting force as True creates the thing again even though it might have already been generated and saved previously
-	#
-	d.clean_text(force = False)
-	d.create_dict(force = False)
-	d.create_corpus(force = False)
-	d.create_tfidf(force = False)
-	d.create_lsi(force = False)
-	d.display_lsi(n = 10) #n being number of topics to display
-#
+	t_list = [
+	'31-03-2015_02'
+	]
+	for r in t_list:		
+		d = deepthought(r)
+		d.load(t) #key from boto
+		logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename = '[LOG]-' + r)
+
+		#
+		# Setting force as True creates the thing again even though it might have already been generated and saved previously
+		#
+		#d.clean_text(force = True)
+		#d.create_dict(force = True)
+		#d.create_corpus(force = True)
+		#d.create_tfidf(force = True)
+		#d.create_lsi(force = True)
+		d.display_lsi(n = 100) #n being number of topics to display
+
+def gen_date(parameters): 
+# parameters as a dictionary
+# 'months': (11,12)
+# 'days': (12, 19)
+# 'years': (2015, 2015) for consistency
+# 'hours': (15,19)
+# return a list
+	a = datetime.datetime(parameters['years'][0], parameters['months'][0], parameters['days'][0], parameters['hours'][0])
+	b = datetime.datetime(parameters['years'][1], parameters['months'][1], parameters['days'][1], parameters['hours'][1])
+	c = b - a
+	no_h = divmod(c.days * 86400 + c.seconds, 3600)[0]
+	date_list = [b - datetime.timedelta(hours = x) for x in xrange(0, no_h)]
+	date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y = x.strftime('%Y'), m = x.strftime('%m'), d = x.strftime('%d'), h = x.strftime('%H')), date_list)
+	return date_list
+
+
 # this part assumes loading from boto
 class deepthought(object):
 	def __init__(self, key):
@@ -223,7 +251,13 @@ class deepthought(object):
 		else:
 			self.lsi_creator()
 	def lsi_creator(self, document_size = 1000):
-		self.tfidf.load(self.fp['tfidf'])
+		self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+		self.corpus = corpora.MmCorpus(self.f_corp)
+
+		self.tfidf = models.TfidfModel.load(self.fp['tfidf'])
+
+		self.corpus_tfidf = self.tfidf[self.corpus]
+
 		print self.tfidf
 		self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
 		self.lsi = models.LsiModel(self.corpus_tfidf, id2word = self.dict, num_topics = 200)
@@ -232,7 +266,10 @@ class deepthought(object):
 		self.lsi.save(self.fp['lsi'])
 		logging.info("LSA model created.")
 	def display_lsi(self, n = 10):
+
 		self.lsi = models.LsiModel.load(self.fp['lsi'])
 		self.lsi.print_topics(n)
+		self.lsi.print_debug(n)
+		self.lsi.show_topic(n)
 if __name__ == '__main__':
 	main()
