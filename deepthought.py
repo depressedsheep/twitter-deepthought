@@ -25,6 +25,7 @@ import numpy as np
 import json
 import re
 import cPickle as pickle #i don't care even if cPickle is much slower than alternatives like thrift or messagepack; i'm trying to get something done here
+import brain.cleaner
 import base64
 import logging
 
@@ -43,12 +44,12 @@ def main():
 		#
 		# Setting force as True creates the thing again even though it might have already been generated and saved previously
 		#
-		#d.clean_text(force = True)
+		d.clean_text(force = False)
 		#d.create_dict(force = True)
 		#d.create_corpus(force = True)
 		#d.create_tfidf(force = True)
 		#d.create_lsi(force = True)
-		d.display_lsi(n = 100) #n being number of topics to display
+		#d.display_lsi(n = 100) #n being number of topics to display
 
 def gen_date(parameters): 
 # parameters as a dictionary
@@ -74,6 +75,7 @@ class deepthought(object):
 		self.key = key
 		self.k = Key(self.bucket)
 		self.k.key = self.key
+		
 		self.t_stop = ['rt', '#', 'http', '@'] #this is an arbitary stop list, and will change depending on analysis goals
 		self.dirs = {
 		'load':'thinking',
@@ -88,6 +90,7 @@ class deepthought(object):
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}
+
 	def ensure_dir(self,f): 
 		if not os.path.exists(f):
 			os.makedirs(f)
@@ -99,64 +102,13 @@ class deepthought(object):
 		#load from boto here 
 		self.ensure_dir(self.dirs['load'])
 		if not os.path.exists(os.path.join('thinking', savepath + '.gz')):
-			logger.info("Raw compressed file does not existing. Downloading.")
+			logging.info("Raw compressed file does not exist. Downloading.")
 			print self.key
 			self.k.get_contents_to_filename(os.path.join('thinking',savepath + '.gz'))
 		self.f = gzip.open(os.path.join('thinking',savepath+'.gz'), 'rb')
 		print self.f
 		a = json.loads(self.f.readline())
 		#print a['text']
-	def clean_text(self, force = False): #generate cleaned text
-		logging.info("Attempting to clean text...")
-		self.ensure_dir(self.dirs['dump'])
-		if os.path.exists(os.path.join(self.dirs['dump'], self.key)):
-			if not force:
-				logging.info("Text already cleaned. Set force to True to force clean.")
-				pass
-			else: 
-				logging.info("Forced to clean text.")
-				self.cleaner()
-		else:
-			self.cleaner()
-
-	def cleaner(self):
-		self.f_text = open(os.path.join(self.dirs['dump'], self.key), 'wb')
-		for tweet in self.f:
-				tweet = json.loads(tweet)
-				text = tweet['text']
-				text = self.clean(text) #returned as a list
-				self.f_text.write(' '.join(text).encode('ascii','ignore') + '\n')
-		self.f_text.close()
-		logging.info("Text cleaned.")
-	def clean(self, rawtext):
-		tl = unicode(rawtext.lower()).split(' ') #convert to unicode so regex, which removes emojis can work
-		tl = self.strip_emojis(tl)
-		tl = filter(lambda w: (not w in stop), tl) #apply nltk stop list for normal, useless words
-		tl = map(self.strip_escape ,tl) #remove escape characters like \n
-		tl = filter(self.strip_others, tl) 
-		return tl
-
-	def strip_emojis(self,tl):
-		myre = re.compile(u'['u'\U0001f300-\U0001ffff'u'\U0001f600-\U0001f64f'u'\U0001f680-\U0001f6ff'u'\u2600-\u26ff\u2700-\u27bf]+', re.UNICODE)
-		return myre.sub('', ' '.join(tl)).split(' ')
-
-	def strip_escape(self, text):
-		while True:
-			if text[:1] == '\n':
-				text = text[1:]
-			else:
-				break
-		return text
-
-	def strip_others(self, text):
-		#
-		# For now, remove all hashtags and links because the focus now is going to be only on the words.
-		#
-		for a in self.t_stop:
-			if a in text:
-				#print text
-				return False
-		return True
 
 	def create_dict(self, force = False):
 		logging.info("Attempting to create dictionary...")
@@ -268,8 +220,8 @@ class deepthought(object):
 	def display_lsi(self, n = 10):
 
 		self.lsi = models.LsiModel.load(self.fp['lsi'])
-		self.lsi.print_topics(n)
+
 		self.lsi.print_debug(n)
-		self.lsi.show_topic(n)
+
 if __name__ == '__main__':
 	main()
