@@ -80,9 +80,7 @@ class deepthought(object):
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}
-	def clean(self):
-		broom = brain.cleaner.broom(self.f, self.key)
-		broom.sweep()
+
 	def ensure_dir(self,f): 
 		if not os.path.exists(f):
 			os.makedirs(f)
@@ -102,32 +100,21 @@ class deepthought(object):
 		a = json.loads(self.f.readline())
 		#print a['text']
 
+	def clean(self):
+		self.ensure_dir(self.dirs['dump'])
+		broom = brain.cleaner.broom(self.f, self.key)
+		broom.sweep()
+
 	def create_dict(self):
+		self.ensure_dir(self.dirs['dict'])
 		d = brain.dicter.librarian(self.key)
 		d.gen()
 
-	def create_corpus(self, force = False):
-		logging.info("Attempting to create corpus...")
+	def create_corpus(self):
 		self.ensure_dir(self.dirs['corp'])
+		c = brain.corpus.blobbify(self.key)
+		c.gen()
 
-		if os.path.exists(self.fp['corp']):
-			if force == False:
-				logging.info("Corpus exists already. Set force to True to create it again.")
-			else:
-				logging.info("Forced to create corpus.")
-				self.corpus_creator()
-		else:
-			self.corpus_creator()
-
-	def corpus_creator(self):
-		self.f_dict = open(os.path.join(self.dirs['dict'], self.key),'rb+') #dictionary
-		self.f_text = open(os.path.join(self.dirs['dump'], self.key),'rb+')
-		self.dict = pickle.load(self.f_dict)
-		corpora.MmCorpus.serialize(self.fp['corp'], [self.dict.doc2bow(line.split(' ')) for line in self.f_text])
-	
-		logging.info("Corpus created, and written into thinking/braincorpus/[KEY_NAME].mm in the Market Matrix format.")
-		self.f_text.close()
-		self.f_dict.close()
 	def create_tfidf(self, force = False):
 		logging.info("Attempting to create tf-idf model.")
 		self.ensure_dir(self.dirs['tfidf'])

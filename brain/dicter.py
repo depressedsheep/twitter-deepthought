@@ -15,11 +15,15 @@ class librarian(object):
 	def gen(self):
 		self.f_dict = open(self.dirs['dict'],'w')
 		self.f_text = open(self.dirs['dump'],'r')
+
 		self.dict = corpora.Dictionary(line[:-1].lower().split() for line in self.f_text)
 		once_ids = [tokenid for tokenid,docfreq in self.dict.iteritems() if docfreq == 1]
 		self.dict.filter_tokens(once_ids)
 		self.dict.compactify()
+
 		pickle.dump(self.dict, self.f_dict) #this is a dump of the dictionary
+
 		self.f_text.close()
 		self.f_dict.close()
+		
 		print "Dict file created at " + self.dirs['dict']
