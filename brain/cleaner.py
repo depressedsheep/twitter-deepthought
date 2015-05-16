@@ -13,12 +13,11 @@ class broom(object):
 		self.key = key
 		self.f = f
 		self.dirs = {
-		'dump':os.path.join('/../thinking/braindump', self.key + '.dict'),
+		'dump':os.path.join('/../thinking/braindump', self.key),
 		'raw':os.path.join('')
 		}
 		self.f_text = open(os.path.dirname(__file__) + self.dirs['dump'], 'w')
-		self.t_stop = ['rt', '#','http', '@']
-		print "Dump file for cleaned text created at " + self.dirs['dump']
+		self.t_stop = ['rt', '#','http', '@']		
 	def sweep(self):
 		for tweet in self.f:
 			tweet = json.loads(tweet)
@@ -26,7 +25,7 @@ class broom(object):
 			text = self.clean(text)
 			self.f_text.write(' '.join(text).encode('ascii','ignore') + '\n')
 		self.f_text.close()
-		print "Text cleaned."
+		print "Dump file for cleaned text created at " + self.dirs['dump']
 	def clean(self,text):
 		tl = unicode(text.lower()).split(' ')
 		tl = self.strip_emojis(tl)

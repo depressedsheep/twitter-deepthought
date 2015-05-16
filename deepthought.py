@@ -2,17 +2,7 @@
 # Main analysis module for compressed files. Imports crawler.py and aims to define functions 
 # to parse and analyse the tweets in various ways, most probably with gensim
 # 
-# LOG
-# Completed:
-# ----------
-# - TF-IDF vectors
-# - Create a LSA model and update it at every time interval
-#
-# To-do:
-# ------
-# - Figure out how to run this concurrently with crawler.py
-# - Decide on size of LSA
-# 
+
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from gensim import corpora, models, similarities
@@ -25,7 +15,7 @@ import numpy as np
 import json
 import re
 import cPickle as pickle #i don't care even if cPickle is much slower than alternatives like thrift or messagepack; i'm trying to get something done here
-import brain.cleaner
+import brain.dicter, brain.cleaner
 import base64
 import logging
 
@@ -44,8 +34,8 @@ def main():
 		#
 		# Setting force as True creates the thing again even though it might have already been generated and saved previously
 		#
-		d.clean_text(force = False)
-		#d.create_dict(force = True)
+		d.clean()
+		d.create_dict()
 		#d.create_corpus(force = True)
 		#d.create_tfidf(force = True)
 		#d.create_lsi(force = True)
@@ -90,7 +80,9 @@ class deepthought(object):
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}
-
+	def clean(self):
+		broom = brain.cleaner.broom(self.f, self.key)
+		broom.sweep()
 	def ensure_dir(self,f): 
 		if not os.path.exists(f):
 			os.makedirs(f)
@@ -110,34 +102,9 @@ class deepthought(object):
 		a = json.loads(self.f.readline())
 		#print a['text']
 
-	def create_dict(self, force = False):
-		logging.info("Attempting to create dictionary...")
-		self.ensure_dir(self.dirs['dict'])
-		self.f_text = open(os.path.join(self.dirs['dump'],self.key),'r')
-		if os.path.exists(os.path.join(self.dirs['dict'],self.key)):
-			if force == False:
-				logging.info("Dictionary already exists. Set force to True to refresh it.")
-			else:
-				logging.info("Forced to create dictionary.")
-				self.dict_creator()
-		else:
-			self.dict_creator()
-
-	def dict_creator(self):
-		self.f_dict = open(os.path.join(self.dirs['dict'], self.key), 'w')
-
-		self.dict = corpora.Dictionary(line[:-1].lower().split() for line in self.f_text)
-		once_ids = [tokenid for tokenid,docfreq in self.dict.iteritems() if docfreq == 1]
-		self.dict.filter_tokens(once_ids)
-		self.dict.compactify()
-
-		pickle.dump(self.dict, self.f_dict) #this is a dump of the dictionary
-		print self.dict
-
-		self.f_text.close()
-		self.f_dict.close()
-
-		logging.info("Dictionary created.")
+	def create_dict(self):
+		d = brain.dicter.librarian(self.key)
+		d.gen()
 
 	def create_corpus(self, force = False):
 		logging.info("Attempting to create corpus...")
