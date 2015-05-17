@@ -143,6 +143,8 @@ class Crawler(object):
     def tick(self):
         """ Functions called every second/tick
             update_sma isn't called as it has to run every second """
+        if threading is None:
+            return
 
         # tick again self.tick ms from now
         t = threading.Timer(self.tick/1000, self.update_status)
