@@ -3,21 +3,38 @@ import os
 import json
 import re
 import base64
+from config import boto_access, boto_secret
+from boto.s3.connection import Location, S3Connection
+from boto.s3.key import Key
+import gzip
 
 stop = stopwords.words('english')
 
-class broom(object):
-	def __init__(self, f, key):
-		print "Initialising brain.cleaner.broom()..."
-		print "This module assumes that you've already loaded the .gz file."
+class launch(object):
+	def __init__(self, key):
+
+		self.conn = S3Connection(boto_access, boto_secret)
+		self.bucket = self.conn.get_bucket('twitter-deepthought')
+		self.k = Key(self.bucket)
 		self.key = key
-		self.f = f
+		self.k.key = key
+		print "Initialising brain.cleaner.launch()..."
+		print "This module loads and cleans a .gz file."
+		
 		self.dirs = {
 		'dump':os.path.join('/../thinking/braindump', self.key),
 		'raw':os.path.join('')
 		}
 		self.f_text = open(os.path.dirname(__file__) + self.dirs['dump'], 'w')
 		self.t_stop = ['rt', '#','http', '@']		
+	def load(self):
+		if not os.path.exists(os.path.join('thinking', self.key + '.gz')):
+			print ("Raw compressed file does not exist. Downloading...")
+			self.k.get_contents_to_filename(os.path.join('thinking',self.key + '.gz'))
+		else:
+			print 'File already exists. Skipping.'
+		self.f = gzip.open(os.path.join('thinking',self.key+'.gz'), 'rb')
+		print "Downloaded."
 	def sweep(self):
 		for tweet in self.f:
 			tweet = json.loads(tweet)

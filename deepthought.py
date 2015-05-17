@@ -3,14 +3,10 @@
 # to parse and analyse the tweets in various ways, most probably with gensim
 # 
 
-from boto.s3.connection import Location, S3Connection
-from boto.s3.key import Key
 from gensim import corpora, models, similarities
 import logging
 import os
 from nltk.corpus import stopwords
-import gzip
-from config import boto_access, boto_secret
 import numpy as np
 import json
 import re
@@ -18,7 +14,7 @@ import cPickle as pickle #i don't care even if cPickle is much slower than alter
 import brain.dicter, brain.cleaner
 import base64
 import logging
-
+import multiprocessing
 stop = stopwords.words('english')
 
 def main():
@@ -26,20 +22,12 @@ def main():
 	t_list = [
 	'31-03-2015_02'
 	]
-	for r in t_list:		
-		d = deepthought(r)
-		d.load(t) #key from boto
-		logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename = '[LOG]-' + r)
+	
+	d = deepthought(t_list)
+	d.start()
+	logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename = '[LOG]')
 
-		#
-		# Setting force as True creates the thing again even though it might have already been generated and saved previously
-		#
-		d.clean()
-		d.create_dict()
-		#d.create_corpus(force = True)
-		#d.create_tfidf(force = True)
-		#d.create_lsi(force = True)
-		#d.display_lsi(n = 100) #n being number of topics to display
+
 
 def gen_date(parameters): 
 # parameters as a dictionary
@@ -59,12 +47,10 @@ def gen_date(parameters):
 
 # this part assumes loading from boto
 class deepthought(object):
-	def __init__(self, key):
-		self.conn = S3Connection(boto_access, boto_secret)
-		self.bucket = self.conn.get_bucket('twitter-deepthought')
-		self.key = key
-		self.k = Key(self.bucket)
-		self.k.key = self.key
+	def __init__(self, key_list):
+
+		self.key_list = key_list
+		print self.key_list
 		
 		self.t_stop = ['rt', '#', 'http', '@'] #this is an arbitary stop list, and will change depending on analysis goals
 		self.dirs = {
@@ -75,19 +61,22 @@ class deepthought(object):
 		'tfidf': os.path.join('thinking', 'braintfidf'),
 		'lsi': os.path.join('thinking','brainlsi')
 		}
-		self.fp = {
+		"""self.fp = {
 		'lsi': os.path.join(self.dirs['lsi'], self.key + '.lsi'),
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
-		}
-
-	def ensure_dir(self,f): 
-		if not os.path.exists(f):
-			os.makedirs(f)
-	def print_list(self):
-		print "Key list: "
-		for z in self.bucket.list():
-			print z.name
+		}"""
+	def start(self):
+		jobs = []
+		for key in self.key_list:
+			p = multiprocessing.Process(target = self.fetch, args = (key,))
+			jobs.append(p)
+			p.start()
+	def fetch(self, key):
+		print key
+		self.ensure_dir(self.dirs['load'])
+		p = brain.cleaner.launch(key)
+		p.load()
 	def load(self,savepath): 
 		#load from boto here 
 		self.ensure_dir(self.dirs['load'])
@@ -176,6 +165,14 @@ class deepthought(object):
 		self.lsi = models.LsiModel.load(self.fp['lsi'])
 
 		self.lsi.print_debug(n)
+	def ensure_dir(self,f): 
+		if not os.path.exists(f):
+			os.makedirs(f)
+	def print_list(self):
+		print "Key list: "
+		for z in self.bucket.list():
+			print z.name
+
 
 if __name__ == '__main__':
 	main()
