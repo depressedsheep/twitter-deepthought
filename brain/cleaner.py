@@ -11,8 +11,7 @@ import gzip
 stop = stopwords.words('english')
 
 class launch(object):
-	def __init__(self, key):
-
+	def __init__(self, key, queue):
 		self.conn = S3Connection(boto_access, boto_secret)
 		self.bucket = self.conn.get_bucket('twitter-deepthought')
 		self.k = Key(self.bucket)
@@ -27,6 +26,7 @@ class launch(object):
 		}
 		self.f_text = open(os.path.dirname(__file__) + self.dirs['dump'], 'w')
 		self.t_stop = ['rt', '#','http', '@']		
+		queue.put(True)
 	def load(self):
 		if not os.path.exists(os.path.join('thinking', self.key + '.gz')):
 			print ("[{}] Raw compressed file does not exist. Downloading...").format(self.key)
@@ -35,6 +35,7 @@ class launch(object):
 			print 'File already exists. Skipping.'
 		self.f = gzip.open(os.path.join('thinking',self.key+'.gz'), 'rb')
 		print "Downloaded " + self.key
+
 	def sweep(self):
 		print "Attempting to clean " + self.key
 		for tweet in self.f:
@@ -44,6 +45,7 @@ class launch(object):
 			self.f_text.write(' '.join(text).encode('ascii','ignore') + '\n')
 		self.f_text.close()
 		print "Dump file for cleaned text created at " + self.dirs['dump']
+
 	def clean(self,text):
 		tl = unicode(text.lower()).split(' ')
 		tl = self.strip_emojis(tl)
@@ -51,9 +53,11 @@ class launch(object):
 		tl = map(self.strip_escape, tl)
 		tl = filter(self.strip_others, tl)
 		return tl
+
 	def strip_emojis(self, tl):
 		myre = re.compile(u'['u'\U0001f300-\U0001ffff'u'\U0001f600-\U0001f64f'u'\U0001f680-\U0001f6ff'u'\u2600-\u26ff\u2700-\u27bf]+', re.UNICODE)
 		return myre.sub('', ' '.join(tl)).split(' ')
+
 	def strip_escape(self,text):
 		while True:
 			if text[:1] == '\n':
@@ -61,6 +65,7 @@ class launch(object):
 			else:
 				break
 		return text
+
 	def strip_others(self, text):
 		for a in self.t_stop:
 			if a in text:

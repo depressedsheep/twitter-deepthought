@@ -15,6 +15,8 @@ import brain.dicter, brain.cleaner
 import base64
 import logging
 import multiprocessing
+import datetime
+
 stop = stopwords.words('english')
 
 def main():
@@ -22,12 +24,10 @@ def main():
 	'31-03-2015_02',
 	'31-03-2015_03'
 	]
-	
+	t_list.sort(key = lambda x: gen_dto(x))
 	d = deepthought(t_list)
 	d.start()
 	logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename = '[LOG]')
-
-
 
 def gen_date(parameters): 
 # parameters as a dictionary
@@ -43,14 +43,22 @@ def gen_date(parameters):
 	date_list = [b - datetime.timedelta(hours = x) for x in xrange(0, no_h)]
 	date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y = x.strftime('%Y'), m = x.strftime('%m'), d = x.strftime('%d'), h = x.strftime('%H')), date_list)
 	return date_list
-
-
+def gen_dto(date):
+	# e.g. '31-03-2015_02'
+	d = []
+	d.append(date[6:10]) #y
+	d.append(date[3:5]) #m
+	d.append(date[:2]) #d
+	d.append(date[-2:]) #h
+	d = map(lambda x: int(x), d)
+	t = datetime.datetime(d[0], d[1], d[2], d[3])
+	return t
 # this part assumes loading from boto
 class deepthought(object):
 	def __init__(self, key_list):
 
 		self.key_list = key_list
-		print self.key_list
+		print "Requesting " + str(self.key_list)
 		
 		self.t_stop = ['rt', '#', 'http', '@'] #this is an arbitary stop list, and will change depending on analysis goals
 		self.dirs = {
@@ -67,22 +75,26 @@ class deepthought(object):
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}"""
 	def start(self):
+		queue = multiprocessing.Queue()
 		jobs = []
 		for key in self.key_list:
-			p = multiprocessing.Process(target = self.fetch, args = (key,))
+			p = multiprocessing.Process(target = self.fetch, args = (key,queue,))
 			jobs.append(p)
 			p.start()
-	def fetch(self, key):
+			queue.get()
+			p.join()
+		self.create_dict()
+
+	def fetch(self, key, queue):
 		self.ensure_dir(self.dirs['load'])
-		p = brain.cleaner.launch(key)
-		p.load()
-		p.sweep()
+		p = brain.cleaner.launch(key,queue)
+		#p.load()
+		#p.sweep()
 
 	def create_dict(self):
 		self.ensure_dir(self.dirs['dict'])
-		d = brain.dicter.librarian(self.key)
-		d.gen()
-
+		d = brain.dicter.librarian(self.key_list)
+		d.cookhash()
 	def create_corpus(self):
 		self.ensure_dir(self.dirs['corp'])
 		c = brain.corpus.blobbify(self.key)
