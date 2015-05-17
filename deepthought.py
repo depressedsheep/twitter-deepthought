@@ -18,9 +18,9 @@ import multiprocessing
 stop = stopwords.words('english')
 
 def main():
-	t = '31-03-2015_00'
 	t_list = [
-	'31-03-2015_02'
+	'31-03-2015_02',
+	'31-03-2015_03'
 	]
 	
 	d = deepthought(t_list)
@@ -73,7 +73,6 @@ class deepthought(object):
 			jobs.append(p)
 			p.start()
 	def fetch(self, key):
-		print key
 		self.ensure_dir(self.dirs['load'])
 		p = brain.cleaner.launch(key)
 		p.load()

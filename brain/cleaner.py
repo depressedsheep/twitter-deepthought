@@ -18,8 +18,8 @@ class launch(object):
 		self.k = Key(self.bucket)
 		self.key = key
 		self.k.key = key
-		print "Initialising brain.cleaner.launch()..."
-		print "This module loads and cleans a .gz file."
+		print "[{}] Initialising brain.cleaner.launch()...".format(self.key)
+		print "[{}] This module loads and cleans a .gz file.".format(self.key)
 		
 		self.dirs = {
 		'dump':os.path.join('/../thinking/braindump', self.key),
@@ -29,12 +29,12 @@ class launch(object):
 		self.t_stop = ['rt', '#','http', '@']		
 	def load(self):
 		if not os.path.exists(os.path.join('thinking', self.key + '.gz')):
-			print ("Raw compressed file does not exist. Downloading...")
+			print ("[{}] Raw compressed file does not exist. Downloading...").format(self.key)
 			self.k.get_contents_to_filename(os.path.join('thinking',self.key + '.gz'))
 		else:
 			print 'File already exists. Skipping.'
 		self.f = gzip.open(os.path.join('thinking',self.key+'.gz'), 'rb')
-		print "Downloaded."
+		print "Downloaded " + self.key
 	def sweep(self):
 		print "Attempting to clean " + self.key
 		for tweet in self.f:
