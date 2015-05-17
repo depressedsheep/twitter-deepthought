@@ -77,22 +77,7 @@ class deepthought(object):
 		self.ensure_dir(self.dirs['load'])
 		p = brain.cleaner.launch(key)
 		p.load()
-	def load(self,savepath): 
-		#load from boto here 
-		self.ensure_dir(self.dirs['load'])
-		if not os.path.exists(os.path.join('thinking', savepath + '.gz')):
-			logging.info("Raw compressed file does not exist. Downloading.")
-			print self.key
-			self.k.get_contents_to_filename(os.path.join('thinking',savepath + '.gz'))
-		self.f = gzip.open(os.path.join('thinking',savepath+'.gz'), 'rb')
-		print self.f
-		a = json.loads(self.f.readline())
-		#print a['text']
-
-	def clean(self):
-		self.ensure_dir(self.dirs['dump'])
-		broom = brain.cleaner.broom(self.f, self.key)
-		broom.sweep()
+		p.sweep()
 
 	def create_dict(self):
 		self.ensure_dir(self.dirs['dict'])

@@ -36,6 +36,7 @@ class launch(object):
 		self.f = gzip.open(os.path.join('thinking',self.key+'.gz'), 'rb')
 		print "Downloaded."
 	def sweep(self):
+		print "Attempting to clean " + self.key
 		for tweet in self.f:
 			tweet = json.loads(tweet)
 			text = tweet['text']
