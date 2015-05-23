@@ -7,7 +7,8 @@ import gzip
 import threading
 import logging
 import pprint
-from collections import deque
+import zipfile
+import shutil
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 from config import ck, cs, ot, ots, boto_access, boto_secret, public_dir
@@ -20,7 +21,7 @@ OAUTH_TOKEN_SECRET = ots
 
 def main():
     # Run crawler
-    c = Crawler(sma_length=1)
+    c = Crawler()
     try:
         c.start()
     except KeyboardInterrupt:
@@ -35,10 +36,13 @@ def init_twitter_api():
     return twitter_api
 
 
-def upload_file(file_path, key, bucket_name='twitter-deepthought'):
+def upload_file(file_path, key=None, bucket_name='twitter-deepthought'):
     """ Uploads the specified file to Amazon S3 through Boto
     :param file_path: The file path
     """
+    if key == None:
+        key = file_path
+
     # Authenticate with Amazon S3
     conn = S3Connection(boto_access, boto_secret)
 
@@ -61,41 +65,55 @@ def upload_file(file_path, key, bucket_name='twitter-deepthought'):
         pass
 
 
+def zipdir(path, ziph):
+    # ziph is zipfile handle
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ziph.write(os.path.join(root, file))
+
+
+def upload_dir(dir_path, key=None):
+    if key == None:
+        key = dir_path
+    file_path = key + '.zip'
+    zipf = zipfile.ZipFile(file_path, 'w')
+    zipdir(dir_path, zipf)
+    zipf.close()
+    upload_file(file_path, key)
+
+
 class Crawler(object):
     """ Accepts Twitter tweet stream and save them hourly
 
     Attributes:
         total_tweets        The total number of tweets the crawler has collected
-        tweets_per_second   The number of tweets received in the previous second
+        tps                 Tweets Per Second
         start_time          Time when the crawler started
         stream              The Twitter stream where the crawler will get the tweets from
-        file                The current GzipFile the crawler is writing to (changes every hour)
-        sma_tweets          Queue to calculate Smoothed Moving Average of number of tweets collected
-        tick                The number of milliseconds for each tick/update
+        dir                 The current directory where the crawler is writing to
+        tweets_file         The current file where tweets are being stored
+        tps_file            The current file where Tweets Per Second are being recorded
     """
 
     total_tweets = 0
-    tweets_per_second = 0
+    tps = 0
     start_time = datetime.time()
     stream = twitter.TwitterStream()
-    file = gzip.GzipFile
-    sma_tweets = deque()
-    tick = 1000
+    dir = ""
+    tweets_file = gzip.GzipFile
+    tps_file = gzip.GzipFile
 
-    def __init__(self, sma_length=10):
+    def __init__(self):
         """ Initializes class attributes
-        :param sma_length: Duration (in minutes) of SMA sample size
         """
-        # Extends the SMA Tweets queue to accommodate the sample size
-        self.sma_tweets.extend([0] * (60 * sma_length))
 
         # Initializes a Twitter Stream
         twitter_api = init_twitter_api()
         self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
             .statuses.sample(language='en')
 
-        # Initializes the file the crawler is going to write to
-        self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
+        # Initializes the directory the crawler is going to write to
+        self.init_dir()
 
         # Configure logging
         logging.basicConfig(
@@ -103,75 +121,38 @@ class Crawler(object):
             format='%(asctime)s: %(message)s',
             datefmt='%m/%d/%Y %I:%M:%S %p')
 
-        # Clear previous SMA graph
-        with open(public_dir + "sma_graph.txt", 'w') as f:
-            f.write('')
-
     def start(self):
         """ Main function to start the collection of tweets """
+
         # Mark start time
         self.start_time = datetime.datetime.now()
 
-        # Initial call to tick, after which it will loop every tick
-        self.tick()
-
-        # Initial call to update_sma, after which it will loop every 1s
-        self.update_sma()
+        # Initial call to update status
+        self.update_status()
 
         # Iterate tweets
         try:
             for tweet in self.stream:
                 # Update counters
                 self.total_tweets += 1
-                self.tweets_per_second += 1
+                self.tps += 1
 
                 # Write tweet to file
-                self.file.write(json.dumps(tweet) + '\r\n')
+                self.tweets_file.write(json.dumps(tweet) + ',')
 
-                # If the current file name is outdated
-                if self.file.name != time.strftime('%d-%m-%Y_%H') + '.json.gz':
-                    self.change_file()
+                # If the current directory name is outdated
+                if self.dir != time.strftime('%d-%m-%Y_%H'):
+                    self.change_dir()
         except StopIteration:
             print "Stream stopped unexpectedly."
             self.stop()
 
     def stop(self):
-        """ Do cleanup work """
-        self.file.close()
-        print 'Crawling stopped/interrupted'
-
-    def tick(self):
-        """ Functions called every second/tick
-            update_sma isn't called as it has to run every second """
-        if threading is None:
-            return
-
-        # tick again self.tick ms from now
-        t = threading.Timer(self.tick/1000, self.update_status)
-        t.daemon = True
-        t.start()
-
-        # Update status every tick
-        self.update_status()
-
-    def update_sma(self):
-        """ Update the SMA queue with the number of tweets
-            received in the last second
+        """ Do cleanup work
         """
-        if threading is None:
-            return
-
-        # Call update_sma again 1s from now
-        t = threading.Timer(1.0, self.update_sma)
-        t.daemon = True
-        t.start()
-
-        # Remove the oldest record and add the latest record
-        self.sma_tweets.pop()
-        self.sma_tweets.appendleft(self.tweets_per_second)
-
-        # Reset counter
-        self.tweets_per_second = 0
+        self.tweets_file.close()
+        self.tps_file.close()
+        print 'Crawling stopped/interrupted'
 
     def update_status(self):
         """ Log the current status of the crawler and sends status to frontend
@@ -179,19 +160,20 @@ class Crawler(object):
         if threading is None:
             return
 
-        # Calculates some key statistics
+        # Update status every second
+        t = threading.Timer(1, self.update_status)
+        t.daemon = True
+        t.start()
+
+        # Calculate time elapsed
         elapsed_time = datetime.datetime.now() - self.start_time
-        if elapsed_time.total_seconds() > len(self.sma_tweets):
-            sma = sum(self.sma_tweets) / float(len(self.sma_tweets))
-        else:
-            sma = 0.0
 
         status = {
             'total_tweets': self.total_tweets,
             'duration': int(elapsed_time.total_seconds()),
-            'sma': round(sma, 2),
-            'file_path': self.file.name,
-            'file_size': os.path.getsize(self.file.name)
+            'tweets_per_second': self.tps,
+            'tweets_file_path': self.tweets_file.name,
+            'tweets_file_size': os.path.getsize(self.tweets_file.name),
         }
 
         # Logs to console
@@ -201,27 +183,68 @@ class Crawler(object):
         with open(public_dir + "status.json", 'w') as f:
             f.write(json.dumps(status))
 
-        # Record SMA for graphing later
-        if int(elapsed_time.total_seconds()) > len(self.sma_tweets):
-            with open(public_dir + "sma_graph.txt", 'ab') as f:
-                f.write("[" + str(status['duration']) + "," + str(status['sma']) + "],")
+        # Update tps file
+        self.tps_file.write(json.dumps({time.time(): self.tps}) + ',')
 
-    def change_file(self):
+        # Reset counter for tweets per second
+        self.tps = 0
+
+
+    def change_dir(self):
         """ Change the file the crawler is writing to
             and starts processing previous hour's file
         """
-        if self.file.name != time.strftime('%d-%m-%Y_%H') + '.json.gz':
-            # Sets the key of this file
-            key = self.file.name.split('.')[0]
-
+        if self.dir != time.strftime('%d-%m-%Y_%H'):
             # Starts the upload
-            t = threading.Thread(target=upload_file, args=(self.file.name, key))
+            t = threading.Thread(target=self.process_dir, args=(self.dir,))
             t.daemon = True
             t.start()
 
-            # Change file
-            self.file.close()
-            self.file = gzip.open(time.strftime('%d-%m-%Y_%H') + '.json.gz', 'ab')
+            # Change dir
+            self.tweets_file.close()
+            self.tps_file.close()
+            self.init_dir()
+
+    def init_dir(self):
+        """ Initializes the directory the crawler is going to write to
+        """
+
+        self.dir = time.strftime('%d-%m-%Y_%H')
+        if not os.path.exists(self.dir):
+            os.makedirs(self.dir)
+
+        self.tweets_file = open(self.dir + '/tweets.json', 'ab')
+        self.tps_file = open(self.dir + '/tps.json', 'ab')
+
+    def process_dir(self, dir):
+        # Loop through each file in the directory
+        for root, dirs, files in os.walk(dir):
+            for name in files:
+                file_path = os.path.join(root, name)
+
+                # Read the contents of the file
+                original_f = open(file_path)
+                contents = original_f.read()
+                original_f.close()
+
+                # Process JSON files
+                file_ext = os.path.splitext(file_path)[1]
+                if file_ext == '.json':
+                    contents = '[' + contents[:-1] + ']'
+
+                # Compress and write the contents to a new file
+                compressed_f = gzip.open(file_path + '.gz', 'wb')
+                compressed_f.write(contents)
+                compressed_f.close()
+
+                # Remove the old, uncompressed file
+                os.remove(file_path)
+
+        # Upload the directory
+        upload_dir(dir)
+
+        # Delete the directory after upload, to save space
+        shutil.rmtree(dir)
 
 
 if __name__ == '__main__':
