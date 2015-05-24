@@ -11,7 +11,7 @@ import numpy as np
 import json
 import re
 import cPickle as pickle #i don't care even if cPickle is much slower than alternatives like thrift or messagepack; i'm trying to get something done here
-import brain.dicter, brain.cleaner
+import brain.dicter, brain.cleaner, brain.corpus
 import base64
 import logging
 import multiprocessing
@@ -31,6 +31,8 @@ def main():
 	t_list.sort(key = lambda x: gen_dto(x))
 	d = deepthought(t_list)
 	d.start()
+	d.create_dict()
+	d.create_corpus()
 	logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename = '[LOG]')
 
 def gen_date(parameters): 
@@ -78,6 +80,11 @@ class deepthought(object):
 		'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}"""
+		try:
+			self.fname = self.get_hashbrown()
+		except:
+			pass
+
 	def start(self):
 		print "Download started."
 		queue = multiprocessing.Queue()
@@ -95,17 +102,18 @@ class deepthought(object):
 		p = brain.cleaner.launch(key,queue)
 		p.load()
 		#p.sweep()
-
+	def get_hashbrown(self):
+		f = pickle.load(open(os.path.join('thinking','hashbrowns'), 'rb'))
+		return f['-'.join(self.key_list)]
 	def create_dict(self):
 		self.ensure_dir(self.dirs['dict'])
 		d = brain.dicter.librarian(self.key_list)
-		d.cookhash()
+		self.fname = d.cookhash()
+		d.gen()
 	def create_corpus(self):
 		self.ensure_dir(self.dirs['corp'])
-		c = brain.corpus.blobbify(self.key)
-		self.fname = c.gen()
-		print self.fname
-
+		c = brain.corpus.blobbify(self.fname)
+		c.gen()
 	def create_tfidf(self, force = False):
 		logging.info("Attempting to create tf-idf model.")
 		self.ensure_dir(self.dirs['tfidf'])
@@ -165,7 +173,6 @@ class deepthought(object):
 	def display_lsi(self, n = 10):
 
 		self.lsi = models.LsiModel.load(self.fp['lsi'])
-
 		self.lsi.print_debug(n)
 	def ensure_dir(self,f): 
 		if not os.path.exists(f):
