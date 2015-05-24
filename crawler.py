@@ -184,7 +184,8 @@ class Crawler(object):
             f.write(json.dumps(status))
 
         # Update tps file
-        self.tps_file.write(json.dumps({time.time(): self.tps}) + ',')
+        timestamp = str(time.time())
+        self.tps_file.write("\"" + timestamp + "\":" + str(self.tps) + ',')
 
         # Reset counter for tweets per second
         self.tps = 0
@@ -228,9 +229,10 @@ class Crawler(object):
                 original_f.close()
 
                 # Process JSON files
-                file_ext = os.path.splitext(file_path)[1]
-                if file_ext == '.json':
+                if name == "tweets.json":
                     contents = '[' + contents[:-1] + ']'
+                elif name == "tps.json":
+                    contents = '{' + contents[:-1] + '}'
 
                 # Compress and write the contents to a new file
                 compressed_f = gzip.open(file_path + '.gz', 'wb')
