@@ -7,7 +7,7 @@ from config import boto_access, boto_secret
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 import gzip
-
+import zipfile
 stop = stopwords.words('english')
 
 class launch(object):
@@ -15,10 +15,12 @@ class launch(object):
 		self.conn = S3Connection(boto_access, boto_secret)
 		self.bucket = self.conn.get_bucket('twitter-deepthought')
 		self.k = Key(self.bucket)
+		if not any([z.name for z in self.bucket.list()]):
+			key = 'z' + key
 		self.key = key
 		self.k.key = key
 		print "[{}] Initialising brain.cleaner.launch()...".format(self.key)
-		print "[{}] This module loads and cleans a .gz file.".format(self.key)
+		print "[{}] This module loads and cleans a compressed file.".format(self.key)
 		
 		self.dirs = {
 		'dump':os.path.join('/../thinking/braindump', self.key),
@@ -28,12 +30,14 @@ class launch(object):
 		self.t_stop = ['rt', '#','http', '@']		
 		queue.put(True)
 	def load(self):
-		if not os.path.exists(os.path.join('thinking', self.key + '.gz')):
-			print ("[{}] Raw compressed file does not exist. Downloading...").format(self.key)
-			self.k.get_contents_to_filename(os.path.join('thinking',self.key + '.gz'))
+		if not os.path.exists(os.path.join('thinking', self.key)):
+			print ("[{}] Compressed file does not exist. Downloading...").format(self.key)
+			self.k.get_contents_to_filename(os.path.join('thinking',self.key))
 		else:
 			print 'File already exists. Skipping.'
-		self.f = gzip.open(os.path.join('thinking',self.key+'.gz'), 'rb')
+		#zf = zipfile.ZipFile(os.path.join('thinking',self.key + '.zip'))
+		#zf.extractall()
+		self.f = gzip.open(os.path.join('thinking',self.key), 'rb')
 		print "Downloaded " + self.key
 
 	def sweep(self):

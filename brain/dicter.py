@@ -43,6 +43,7 @@ class librarian(object):
 				pickle.dump(cfood, open(self.dirs['flib'], 'w'))
 				self.merge()
 		print "Hashbrown done."
+		return self.fname
 
 
 	def gen(self):

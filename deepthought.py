@@ -16,6 +16,10 @@ import base64
 import logging
 import multiprocessing
 import datetime
+from brain.config import boto_access, boto_secret
+from boto.s3.connection import Location, S3Connection
+from boto.s3.key import Key
+import zipfile
 
 stop = stopwords.words('english')
 
@@ -75,6 +79,7 @@ class deepthought(object):
 		'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
 		}"""
 	def start(self):
+		print "Download started."
 		queue = multiprocessing.Queue()
 		jobs = []
 		for key in self.key_list:
@@ -83,12 +88,12 @@ class deepthought(object):
 			p.start()
 			queue.get()
 			p.join()
-		self.create_dict()
+		#self.create_dict()
 
 	def fetch(self, key, queue):
 		self.ensure_dir(self.dirs['load'])
 		p = brain.cleaner.launch(key,queue)
-		#p.load()
+		p.load()
 		#p.sweep()
 
 	def create_dict(self):
@@ -98,7 +103,8 @@ class deepthought(object):
 	def create_corpus(self):
 		self.ensure_dir(self.dirs['corp'])
 		c = brain.corpus.blobbify(self.key)
-		c.gen()
+		self.fname = c.gen()
+		print self.fname
 
 	def create_tfidf(self, force = False):
 		logging.info("Attempting to create tf-idf model.")
@@ -166,9 +172,10 @@ class deepthought(object):
 			os.makedirs(f)
 	def print_list(self):
 		print "Key list: "
-		for z in self.bucket.list():
+		conn = S3Connection(boto_access, boto_secret)
+		bucket = conn.get_bucket('twitter-deepthought')
+		for z in bucket.list():
 			print z.name
-
 
 if __name__ == '__main__':
 	main()

@@ -55,7 +55,7 @@ def upload_file(file_path, key=None, bucket_name='twitter-deepthought'):
 
     # Store the file with specified key
     k = Key(bucket)
-    k.key = key
+    k.key = 'z' + key # Quick and dirty designation for newer files, which are zipped
     try:
         k.set_contents_from_filename(file_path)
 
