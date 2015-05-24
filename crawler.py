@@ -138,7 +138,8 @@ class Crawler(object):
                 self.tps += 1
 
                 # Write tweet to file
-                self.tweets_file.write(json.dumps(tweet) + ',')
+                timestamp = str(time.time())
+                self.tweets_file.write('"' + timestamp +'":' + json.dumps(tweet) + ',')
 
                 # If the current directory name is outdated
                 if self.dir != time.strftime('%d-%m-%Y_%H'):
@@ -229,9 +230,7 @@ class Crawler(object):
                 original_f.close()
 
                 # Process JSON files
-                if name == "tweets.json":
-                    contents = '[' + contents[:-1] + ']'
-                elif name == "tps.json":
+                if ".json" in name:
                     contents = '{' + contents[:-1] + '}'
 
                 # Compress and write the contents to a new file
