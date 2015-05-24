@@ -15,8 +15,11 @@ class launch(object):
 		self.conn = S3Connection(boto_access, boto_secret)
 		self.bucket = self.conn.get_bucket('twitter-deepthought')
 		self.k = Key(self.bucket)
-		if not any([z.name for z in self.bucket.list()]):
+		self.z = False
+		if not any([key == z.name for z in self.bucket.list()]):
 			key = 'z' + key
+			print "Using the newer zipped file. Meows."
+			self.z = True
 		self.key = key
 		self.k.key = key
 		print "[{}] Initialising brain.cleaner.launch()...".format(self.key)
@@ -32,12 +35,17 @@ class launch(object):
 	def load(self):
 		if not os.path.exists(os.path.join('thinking', self.key)):
 			print ("[{}] Compressed file does not exist. Downloading...").format(self.key)
-			self.k.get_contents_to_filename(os.path.join('thinking',self.key))
+			if self.z:
+				self.k.get_contents_to_filename(os.path.join('thinking',self.key + '.zip'))
+			else:
+				self.k.get_contents_to_filename(os.path.join('thinking',self.key))
 		else:
 			print 'File already exists. Skipping.'
-		#zf = zipfile.ZipFile(os.path.join('thinking',self.key + '.zip'))
-		#zf.extractall()
-		self.f = gzip.open(os.path.join('thinking',self.key), 'rb')
+		if self.z:
+			zf = zipfile.ZipFile(os.path.join('thinking',self.key + '.zip'))
+			zf.extractall()
+		else:
+			self.f = gzip.open(os.path.join('thinking',self.key), 'rb')
 		print "Downloaded " + self.key
 
 	def sweep(self):
