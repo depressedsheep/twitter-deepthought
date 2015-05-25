@@ -55,7 +55,8 @@ def upload_file(file_path, key=None, bucket_name='twitter-deepthought'):
 
     # Store the file with specified key
     k = Key(bucket)
-    k.key = 'z' + key # Quick and dirty designation for newer files, which are zipped
+    k.key = key
+
     try:
         k.set_contents_from_filename(file_path)
 
@@ -73,12 +74,12 @@ def zipdir(path, ziph):
 
 
 def upload_dir(dir_path, key=None):
-    if key == None:
-        key = dir_path
     file_path = key + '.zip'
     zipf = zipfile.ZipFile(file_path, 'w')
     zipdir(dir_path, zipf)
     zipf.close()
+    if key is None:
+        key = file_path
     upload_file(file_path, key)
 
 
@@ -139,7 +140,7 @@ class Crawler(object):
 
                 # Write tweet to file
                 timestamp = str(time.time())
-                self.tweets_file.write('"' + timestamp +'":' + json.dumps(tweet) + ',')
+                self.tweets_file.write('"' + timestamp + '":' + json.dumps(tweet) + ',')
 
                 # If the current directory name is outdated
                 if self.dir != time.strftime('%d-%m-%Y_%H'):
