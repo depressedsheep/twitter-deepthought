@@ -74,12 +74,12 @@ def zipdir(path, ziph):
 
 
 def upload_dir(dir_path, key=None):
-    file_path = key + '.zip'
+    file_path = dir_path + '.zip'
+    if key is None:
+        key = file_path
     zipf = zipfile.ZipFile(file_path, 'w')
     zipdir(dir_path, zipf)
     zipf.close()
-    if key is None:
-        key = file_path
     upload_file(file_path, key)
 
 
