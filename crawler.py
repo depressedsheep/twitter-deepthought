@@ -7,19 +7,18 @@ import gzip
 import threading
 import logging
 import pprint
-import zipfile
 import shutil
-from boto.s3.connection import Location, S3Connection
-from boto.s3.key import Key
-from config import ck, cs, ot, ots, boto_access, boto_secret, public_dir
-
-CONSUMER_KEY = ck
-CONSUMER_SECRET = cs
-OAUTH_TOKEN = ot
-OAUTH_TOKEN_SECRET = ots
+import helpers
+from config import ck, cs, ot, ots, public_dir
 
 
 def main():
+    # Configure logging
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s: %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p')
+
     # Run crawler
     c = Crawler()
     try:
@@ -31,56 +30,9 @@ def main():
 def init_twitter_api():
     """ Initializes a Twitter API object """
     # Authenticate with twitter api
-    auth = twitter.oauth.OAuth(OAUTH_TOKEN, OAUTH_TOKEN_SECRET, CONSUMER_KEY, CONSUMER_SECRET)
+    auth = twitter.oauth.OAuth(ot, ots, ck, cs)
     twitter_api = twitter.Twitter(auth=auth)
     return twitter_api
-
-
-def upload_file(file_path, key=None, bucket_name='twitter-deepthought'):
-    """ Uploads the specified file to Amazon S3 through Boto
-    :param file_path: The file path
-    """
-    if key == None:
-        key = file_path
-
-    # Authenticate with Amazon S3
-    conn = S3Connection(boto_access, boto_secret)
-
-    # If specified bucket doesn't exist, create it
-    # Else, simply access it
-    if conn.lookup(bucket_name) is None:
-        bucket = conn.create_bucket(bucket_name, location=Location.SAEast)
-    else:
-        bucket = conn.get_bucket(bucket_name)
-
-    # Store the file with specified key
-    k = Key(bucket)
-    k.key = key
-
-    try:
-        k.set_contents_from_filename(file_path)
-
-        # Delete file after upload
-        os.remove(file_path)
-    except:
-        pass
-
-
-def zipdir(path, ziph):
-    # ziph is zipfile handle
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            ziph.write(os.path.join(root, file))
-
-
-def upload_dir(dir_path, key=None):
-    file_path = dir_path + '.zip'
-    if key is None:
-        key = file_path
-    zipf = zipfile.ZipFile(file_path, 'w')
-    zipdir(dir_path, zipf)
-    zipf.close()
-    upload_file(file_path, key)
 
 
 class Crawler(object):
@@ -107,7 +59,7 @@ class Crawler(object):
     def __init__(self):
         """ Initializes class attributes
         """
-
+        logging.info("Initializing twitter stream")
         # Initializes a Twitter Stream
         twitter_api = init_twitter_api()
         self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
@@ -116,14 +68,9 @@ class Crawler(object):
         # Initializes the directory the crawler is going to write to
         self.init_dir()
 
-        # Configure logging
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s: %(message)s',
-            datefmt='%m/%d/%Y %I:%M:%S %p')
-
     def start(self):
         """ Main function to start the collection of tweets """
+        logging.info("Starting crawling")
 
         # Mark start time
         self.start_time = datetime.datetime.now()
@@ -146,15 +93,15 @@ class Crawler(object):
                 if self.dir != time.strftime('%d-%m-%Y_%H'):
                     self.change_dir()
         except StopIteration:
-            print "Stream stopped unexpectedly."
+            logging.error("Stream stopped unexpectedly")
             self.stop()
 
     def stop(self):
         """ Do cleanup work
         """
+        logging.warn('Crawling stopped/interrupted')
         self.tweets_file.close()
         self.tps_file.close()
-        print 'Crawling stopped/interrupted'
 
     def update_status(self):
         """ Log the current status of the crawler and sends status to frontend
@@ -171,15 +118,15 @@ class Crawler(object):
         elapsed_time = datetime.datetime.now() - self.start_time
 
         status = {
-            'total_tweets': self.total_tweets,
             'duration': int(elapsed_time.total_seconds()),
-            'tweets_per_second': self.tps,
-            'tweets_file_path': self.tweets_file.name,
+            'total_tweets': self.total_tweets,
+            'tps': self.tps,
+            'dir': self.dir,
             'tweets_file_size': os.path.getsize(self.tweets_file.name),
         }
 
         # Logs to console
-        logging.info("\n" + pprint.pformat(status) + "\n")
+        logging.debug("\n" + pprint.pformat(status) + "\n")
 
         # Update status to front end
         with open(public_dir + "status.json", 'w') as f:
@@ -192,20 +139,23 @@ class Crawler(object):
         # Reset counter for tweets per second
         self.tps = 0
 
-
     def change_dir(self):
-        """ Change the file the crawler is writing to
-            and starts processing previous hour's file
+        """ Change the dir the crawler is writing to
+            and starts processing previous hour's dir
         """
         if self.dir != time.strftime('%d-%m-%Y_%H'):
+            logging.info("Changing dir from " + self.dir + " to " + time.strftime('%d-%m-%Y_%H'))
+
+            # Close the old files to allow processing
+            self.tweets_file.close()
+            self.tps_file.close()
+
             # Starts the upload
             t = threading.Thread(target=self.process_dir, args=(self.dir,))
             t.daemon = True
             t.start()
 
             # Change dir
-            self.tweets_file.close()
-            self.tps_file.close()
             self.init_dir()
 
     def init_dir(self):
@@ -219,7 +169,15 @@ class Crawler(object):
         self.tweets_file = open(self.dir + '/tweets.json', 'ab')
         self.tps_file = open(self.dir + '/tps.json', 'ab')
 
-    def process_dir(self, dir):
+    @staticmethod
+    def process_dir(dir):
+        """
+        Given a dir, compress and process all its files, and then
+        upload and delete it
+        :param dir: The name of dir to process
+        :return:
+        """
+        logging.info("Processing dir " + dir)
         # Loop through each file in the directory
         for root, dirs, files in os.walk(dir):
             for name in files:
@@ -243,7 +201,7 @@ class Crawler(object):
                 os.remove(file_path)
 
         # Upload the directory
-        upload_dir(dir)
+        helpers.upload_dir(dir)
 
         # Delete the directory after upload, to save space
         shutil.rmtree(dir)

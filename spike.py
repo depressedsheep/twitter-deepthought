@@ -1,57 +1,128 @@
 from __future__ import division
-from config import public_dir
-import os
-import zipfile
-import zlib
+import threading
+from config import public_dir, spike_threshold, ema_length, growth_length
 import json
-from pprint import pprint
 import collections
+import helpers
+import os
+import logging
+import shutil
 
 
 def main():
-    base_fp = "24-05-2015_11"
-    input_fp = base_fp + ".zip"
-    input_tps_fp = base_fp + "/tps.json.gz"
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s: %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p')
 
-    input_f = zipfile.ZipFile(input_fp, "r")
-    compressed_tps = input_f.read(input_tps_fp)
-    tps_f = zlib.decompress(compressed_tps, 16 + zlib.MAX_WBITS)
-    tps_dict = json.loads(tps_f)
-    tps_dict = {int(float(k)):v for k,v in tps_dict.items()}
-
-    ema = {}
-    growth = {}
-    ema_length = 20
-    growth_length = 5
-    k = 2 / (ema_length + 1)
-    prev_ema = 0
-    for i, (timestamp, tps) in enumerate(tps_dict.iteritems()):
-        # Calculates EMA
-        if i == ema_length:
-            avg = sum(tps_dict.values()[:ema_length]) / ema_length
-            ema[timestamp] = avg
-            prev_ema = ema[timestamp]
-        elif i > ema_length:
-            ema[timestamp] = calculate_ema(tps, prev_ema, k)
-            prev_ema = ema[timestamp]
-
-        # Calculates EMA growth
-        if i >= ema_length + growth_length:
-            growth[timestamp] = (ema[timestamp] - ema[timestamp - growth_length]) / ema[timestamp - growth_length]
-
-    ordered_ema = collections.OrderedDict(sorted(ema.items()))
-    ema_graph_fp = public_dir + 'ema.json'
-    with open(ema_graph_fp, 'w') as f:
-        f.write(json.dumps(ordered_ema))
-
-    ordered_growth = collections.OrderedDict(sorted(growth.items()))
-    growth_graph_fp = public_dir + 'growth.json'
-    with open(growth_graph_fp, 'w') as f:
-        f.write(json.dumps(ordered_growth))
+    s = SpikeDetector()
+    try:
+        s.find_spikes()
+    except KeyboardInterrupt:
+        logging.warn("Spike detection stopped")
 
 
-def calculate_ema(current_value, prev_ema, k):
-    return current_value * k + prev_ema * (1 - k)
+class SpikeDetector(object):
+    """ Find if any spikes occurred every hour
+    """
+
+    def find_spikes(self):
+        """
+        At every hour, attempt to find the spikes that occurred within that hour by calculating EMA,
+        EMA growth and then checking if said growth exceeds the threshold
+        """
+        logging.info("Starting spike detection")
+        # Call this function again one hour from now
+        t = threading.Timer(60 * 60, self.find_spikes)
+        t.start()
+
+        # Download and unpack the latest file added to the bucket
+        bucket = helpers.S3Bucket()
+        key = bucket.list_recent_keys(1)[0]
+        fp = bucket.download(key)
+        helpers.decompress_dir(fp)
+        # Remove the .zip extension from the dir path
+        fp = os.path.splitext(fp)[0]
+        # Load the TPS data from the current hour into the dict
+        tps_f = open(os.path.join(fp, "tps.json"), 'r')
+        tps_f_contents = tps_f.read()
+        tps_f.close()
+        tps_dict = json.loads(tps_f_contents)
+        # Convert the timestamps from strings to integers
+        tps_dict = {int(float(k)): v for k, v in tps_dict.items()}
+        # Done with files, delete directory to save space
+        shutil.rmtree(fp)
+
+        # Initialize variables for storing EMA values, growth values, and timestamps of spikes
+        ema = []
+        growth = {}
+        spikes = []
+
+        # Calculate variable k, to be used later to calculate EMA
+        k = 2 / (ema_length + 1)
+
+        # Loop through each tps
+        for i, (timestamp, tps) in enumerate(tps_dict.iteritems()):
+            # Calculate EMA
+            if i == ema_length:  # If this is the first EMA value
+                # EMA = the average of the tps values before this
+                avg = sum(tps_dict.values()[:ema_length]) / ema_length
+                # Add EMA value to list
+                ema.append({timestamp: avg})
+            elif i > ema_length:  # If this is not the first EMA value
+                # Peek the top (previously inserted) EMA value in the stack
+                last_ema = ema[-1].values()[0]
+                # Use EMA formula to calculate EMA for this particular timestamp
+                # Refer to http://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
+                current_ema = tps * k + last_ema * (1 - k)
+                # Add EMA value to the list
+                ema.append({timestamp: current_ema})
+
+            # Calculates EMA growth relative to a certain duration prior
+            if i >= ema_length + growth_length:  # If there are enough EMA values to calculate the growth
+                # Get the current EMA value for this particular timestamp
+                current_ema = ema[-1].values()[0]
+                # Get the EMA value "growth_length" duration before
+                prev_ema = ema[-(1 + growth_length)].values()[0]
+                # Calculates the growth and add it to the dict
+                current_growth = (current_ema - prev_ema) / prev_ema
+                growth[timestamp] = current_growth
+                # Check if growth exceeded the threshold to be considered a spike
+                if current_growth >= spike_threshold:
+                    logging.info("Spike found at " + timestamp + " with a growth of " + current_growth)
+                    spikes.append(timestamp)
+
+        # Combine the list of dicts into one big OrderedDict
+        ordered_ema = collections.OrderedDict((k, v) for d in ema for (k, v) in d.items())
+        # File path where the graphing data is to be stored, for debugging purposes
+        ema_graph_fp = public_dir + 'ema.json'
+        # Write to said file
+        with open(ema_graph_fp, 'w') as f:
+            logging.info("Writing to " + ema_graph_fp)
+            f.write(json.dumps(ordered_ema))
+
+        # Sort the dict of growths and store it in an OrderedDict
+        ordered_growth = collections.OrderedDict(sorted(growth.items()))
+        # Same operation as above
+        growth_graph_fp = public_dir + 'growth.json'
+        with open(growth_graph_fp, 'w') as f:
+            logging.info("Writing to " + growth_graph_fp)
+            f.write(json.dumps(ordered_growth))
+
+        # Sort the dict of tps and store it in an OrderedDict
+        ordered_tps = collections.OrderedDict(sorted(tps_dict.items()))
+        tps_graph_fp = public_dir + "tps.json"
+        with open(tps_graph_fp, 'w') as f:
+            logging.info("Writing to " + tps_graph_fp)
+            f.write(json.dumps(ordered_tps))
+
+        spikes_fp = public_dir + "spikes.json"
+        with open(spikes_fp, 'a') as f:
+            logging.info("Writing to " + spikes_fp)
+            for spike in spikes:
+                f.write(spike + '\n')
+
+        logging.info("Spike detection done for this hour")
 
 
 if __name__ == '__main__':
