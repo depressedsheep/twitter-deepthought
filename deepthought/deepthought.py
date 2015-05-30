@@ -65,8 +65,8 @@ class deepthought(object):
     """
     def __init__(self, key_list):
         self.key_list = key_list
-        print "Requesting " + str(self.key_list)
-        print "Current working directory: " + os.path.abspath(os.curdir)
+        logging.info("Requesting " + str(self.key_list))
+        logging.info("Current working directory: " + os.path.abspath(os.curdir))
         self.t_stop = ['rt', '#', 'http','@']  
         os.chdir("..")
         self.dirs = {
@@ -85,7 +85,7 @@ class deepthought(object):
 
     def start(self):
         """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
-        print "Download started."
+        logging.info("Download started.")
         queue = multiprocessing.Queue()
         jobs = []
         for key in self.key_list:
@@ -137,7 +137,6 @@ class deepthought(object):
 
         self.tfidf = models.TfidfModel(corpus=self.corpus, dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
         self.corpus_tfidf = self.tfidf[self.corpus]
-        print self.tfidf
         self.tfidf.save(self.fp['tfidf'])
 
         logging.info("Tf-idf model created, saved in tfidf_model format.")

@@ -9,3 +9,56 @@
 2015-05-30 17:01:19,978 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
 2015-05-30 17:01:19,978 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
 2015-05-30 17:01:19,979 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:06:43,159 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:06:47,576 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:06:47,577 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:06:52,204 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:06:52,204 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:06:52,209 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:06:52,210 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:06:52,210 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:06:52,210 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:10:00,044 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:10:04,611 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:04,611 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:10:09,019 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:09,019 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:10:09,024 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:10:09,025 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:10:09,025 : INFO : Hashbrown already exists.
+2015-05-30 17:10:09,026 : INFO : Hashbrown done.
+2015-05-30 17:10:09,026 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:10:09,026 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:10:19,066 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:10:23,518 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:23,518 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:10:27,236 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:27,236 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:10:27,239 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:10:27,239 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:10:27,240 : INFO : Hashbrown already exists.
+2015-05-30 17:10:27,240 : INFO : Hashbrown done.
+2015-05-30 17:10:27,240 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:10:27,240 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:10:27,240 : INFO : Initialised brain.corpus.blobbify()
+2015-05-30 17:10:27,240 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:10:27,240 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:10:27,241 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:10:27,241 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:10:28,485 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 17:10:28,485 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:10:33,052 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:33,052 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:10:37,158 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:10:37,158 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:10:37,163 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:10:37,164 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:10:37,164 : INFO : Hashbrown already exists.
+2015-05-30 17:10:37,164 : INFO : Hashbrown done.
+2015-05-30 17:10:37,165 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:10:37,165 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:10:37,166 : INFO : Initialised brain.corpus.blobbify()
+2015-05-30 17:10:37,166 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:10:37,166 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:10:37,167 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:10:37,167 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm

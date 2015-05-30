@@ -8,23 +8,25 @@ from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 import gzip
 import zipfile
+import logging
 stop = stopwords.words('english')
 
 class launch(object):
 	def __init__(self, key, queue):
-
+		logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO) 
+		logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.WARNING)  
 		self.conn = S3Connection(boto_access, boto_secret)
 		self.bucket = self.conn.get_bucket('twitter-deepthought')
 		self.k = Key(self.bucket)
 		self.z = False
 		if not any([key == z.name for z in self.bucket.list()]):
 			key = key + '.zip'
-			print "Using the newer zipped file. Meows."
+			logging.warning("Using the newer zipped file. Meows.")
 			self.z = True
 		self.key = key
 		self.k.key = key
-		print "[{}] Initialising brain.cleaner.launch()...".format(self.key)
-		print "[{}] This module loads and cleans a compressed file.".format(self.key)
+		logging.info("[{}] Initialising brain.cleaner.launch()...".format(self.key))
+		logging.info("[{}] This module loads and cleans a compressed file.".format(self.key))
 		
 		self.dirs = {
 		'dump':os.path.join('thinking/braindump', self.key),
