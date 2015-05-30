@@ -3,3 +3,5 @@ config.py
 25-03-2015_17.json.gz
 config.pyc
 logs*
+*.json
+*.pyc
