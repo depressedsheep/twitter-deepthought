@@ -26,11 +26,12 @@ def main():
     ]
     t_list.sort(key=lambda x: gen_dto(x))
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')    
+
     d = deepthought(t_list)
     d.start()
     d.create_dict()
     d.create_corpus()
-
+    d.create_tfidf()
 
 def gen_date(parameters):
     """ Parameters is a dictionary with the below tuples, printing the possible filenames for the hours in the time range.
@@ -120,7 +121,8 @@ class deepthought(object):
     def create_tfidf(self, force=False):
         logging.info("Attempting to create tf-idf model.")
         self.ensure_dir(self.dirs['tfidf'])
-        if not os.path.exists(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model')):
+        if not os.path.exists(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model')):
+            logging.info("Tf-idf model does not yet exist for the current hash. Creating now.")
             self.tfidf_creator()
         else:
             if force == True:
@@ -131,13 +133,13 @@ class deepthought(object):
 
     def tfidf_creator(self):
         logging.info("Attempting to convert current corpus to the Tf-idf model.")
-        self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+        self.f_corp = open(os.path.join(self.dirs['corp'], self.fname + '.mm'), 'r')
         self.corpus = corpora.MmCorpus(self.f_corp)
         # print self.corpus
 
-        self.tfidf = models.TfidfModel(corpus=self.corpus, dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
+        self.tfidf = models.TfidfModel(corpus=self.corpus, dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.fname))))
         self.corpus_tfidf = self.tfidf[self.corpus]
-        self.tfidf.save(self.fp['tfidf'])
+        self.tfidf.save(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
         logging.info("Tf-idf model created, saved in tfidf_model format.")
 
@@ -149,7 +151,7 @@ class deepthought(object):
         # Currently not very sure, but I'm guessing you'd add an option into the vector generator function to use the 'master' dict, and then add into the LSA structure
         #
         self.ensure_dir(self.dirs['lsi'])
-        if os.path.exists(self.fp['lsi']):
+        if os.path.exists(os.path.join(self.dirs['lsi'],self.fname + '.lsi')):
             if force == True:
                 logging.info("Forced to create LSI/LSA model again.")
                 self.lsi_creator()
@@ -160,24 +162,23 @@ class deepthought(object):
             self.lsi_creator()
 
     def lsi_creator(self, document_size=1000):
-        self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+        self.f_corp = open(os.path.join(self.dirs['corp'], self.filename + '.mm'), 'r')
         self.corpus = corpora.MmCorpus(self.f_corp)
 
-        self.tfidf = models.TfidfModel.load(self.fp['tfidf'])
+        self.tfidf = models.TfidfModel.load(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
         self.corpus_tfidf = self.tfidf[self.corpus]
 
         print self.tfidf
-        self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
+        self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.fname)))
         self.lsi = models.LsiModel(self.corpus_tfidf, id2word=self.dict, num_topics=200)
         self.corpus_lsi = self.lsi[self.corpus_tfidf]  # double wrapper over the original corpus
         self.lsi.print_topics(5)
-        self.lsi.save(self.fp['lsi'])
+        self.lsi.save(os.path.join(self.dirs['lsi'], self.fname + '.lsi'))
         logging.info("LSA model created.")
 
     def display_lsi(self, n=10):
-
-        self.lsi = models.LsiModel.load(self.fp['lsi'])
+        self.lsi = models.LsiModel.load(os.path.join(self.dirs['lsi'], self.fname + '.lsi'))
         self.lsi.print_debug(n)
 
     def ensure_dir(self, f):

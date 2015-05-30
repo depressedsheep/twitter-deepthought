@@ -36,29 +36,29 @@ class launch(object):
 		queue.put(True)
 	def load(self):
 		if not os.path.exists(os.path.join('thinking', self.key)):
-			print ("[{}] Compressed file does not exist. Downloading...").format(self.key)
+			logging.info("[{}] Compressed file does not exist. Downloading...").format(self.key)
 			if self.z:
 				self.k.get_contents_to_filename(os.path.join('thinking',self.key + '.zip'))
 			else:
 				self.k.get_contents_to_filename(os.path.join('thinking',self.key))
 		else:
-			print 'File already exists. Skipping.'
+			logging.info('File already exists. Skipping.')
 		if self.z:
 			zf = zipfile.ZipFile(os.path.join('thinking',self.key + '.zip'))
 			zf.extractall()
 		else:
 			self.f = gzip.open(os.path.join('thinking',self.key), 'rb')
-		print "Downloaded " + self.key
+		logging.info("Downloaded " + self.key)
 
 	def sweep(self):
-		print "Attempting to clean " + self.key
+		logging.info("Attempting to clean " + self.key)
 		for tweet in self.f:
 			tweet = json.loads(tweet)
 			text = tweet['text']
 			text = self.clean(text)
 			self.f_text.write(' '.join(text).encode('ascii','ignore') + '\n')
 		self.f_text.close()
-		print "Dump file for cleaned text created at " + self.dirs['dump']
+		logging.info("Dump file for cleaned text created at " + self.dirs['dump'])
 
 	def clean(self,text):
 		tl = unicode(text.lower()).split(' ')

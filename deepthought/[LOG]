@@ -62,3 +62,84 @@
 2015-05-30 17:10:37,166 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
 2015-05-30 17:10:37,167 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
 2015-05-30 17:10:37,167 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:15:40,823 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 17:15:40,824 : INFO : Current working directory: /home/fadedsheep/Documents/2015/python/twitter-deepthought/deepthought
+2015-05-30 17:15:40,824 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:15:40,824 : INFO : Download started.
+2015-05-30 17:15:45,353 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:15:45,353 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:15:49,893 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:15:49,894 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:15:49,896 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:15:49,896 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:15:49,897 : INFO : Hashbrown already exists.
+2015-05-30 17:15:49,897 : INFO : Hashbrown done.
+2015-05-30 17:15:49,897 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:15:49,897 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:15:49,897 : INFO : Initialised brain.corpus.blobbify()
+2015-05-30 17:15:49,897 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:15:49,897 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:15:49,898 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:15:49,898 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:15:49,898 : INFO : Attempting to create tf-idf model.
+2015-05-30 17:15:49,907 : INFO : Tf-idf model does not yet exist for the current hash. Creating now.
+2015-05-30 17:15:49,908 : INFO : Attempting to convert current corpus to the Tf-idf model.
+2015-05-30 17:15:49,908 : INFO : initializing corpus reader from <open file 'thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm', mode 'r' at 0x7f04487dc930>
+2015-05-30 17:15:49,908 : INFO : accepted corpus with 0 documents, 0 features, 0 non-zero entries
+2015-05-30 17:15:49,908 : WARNING : constructor received both corpus and explicit inverse document frequencies; ignoring the corpus
+2015-05-30 17:15:54,464 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 17:15:54,465 : INFO : Current working directory: /home/fadedsheep/Documents/2015/python/twitter-deepthought/deepthought
+2015-05-30 17:15:54,465 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:15:54,465 : INFO : Download started.
+2015-05-30 17:15:58,918 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:15:58,919 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:16:03,373 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:16:03,373 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:16:03,376 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:16:03,376 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:16:03,377 : INFO : Hashbrown already exists.
+2015-05-30 17:16:03,377 : INFO : Hashbrown done.
+2015-05-30 17:16:03,377 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:16:03,377 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:16:03,377 : INFO : Initialised brain.corpus.blobbify()
+2015-05-30 17:16:03,377 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:16:03,378 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:16:03,378 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:16:03,378 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:16:03,378 : INFO : Attempting to create tf-idf model.
+2015-05-30 17:16:03,378 : INFO : Tf-idf model does not yet exist for the current hash. Creating now.
+2015-05-30 17:16:03,378 : INFO : Attempting to convert current corpus to the Tf-idf model.
+2015-05-30 17:16:03,378 : INFO : initializing corpus reader from <open file 'thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm', mode 'r' at 0x7f1869cfc930>
+2015-05-30 17:16:03,379 : INFO : accepted corpus with 0 documents, 0 features, 0 non-zero entries
+2015-05-30 17:16:03,379 : WARNING : constructor received both corpus and explicit inverse document frequencies; ignoring the corpus
+2015-05-30 17:19:53,183 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 17:19:53,183 : INFO : Current working directory: /home/fadedsheep/Documents/2015/python/twitter-deepthought/deepthought
+2015-05-30 17:19:53,183 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:19:53,183 : INFO : Download started.
+2015-05-30 17:19:57,773 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 17:19:57,807 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 17:19:57,808 : INFO : File already exists. Skipping.
+2015-05-30 17:19:57,808 : INFO : Downloaded 31-03-2015_02
+2015-05-30 17:20:02,334 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 17:20:02,334 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 17:20:02,335 : INFO : File already exists. Skipping.
+2015-05-30 17:20:02,335 : INFO : Downloaded 31-03-2015_03
+2015-05-30 17:20:02,337 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 17:20:02,337 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 17:20:02,337 : INFO : Hashbrown already exists.
+2015-05-30 17:20:02,337 : INFO : Hashbrown done.
+2015-05-30 17:20:02,338 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:20:02,338 : INFO : Dict file created at thinking/braindict/051bfddb-9b06-4da6-9884-c77fc4b90d73
+2015-05-30 17:20:02,338 : INFO : Initialised brain.corpus.blobbify()
+2015-05-30 17:20:02,338 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:20:02,338 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:20:02,339 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:20:02,339 : INFO : MMCorpus file created at thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:20:02,339 : INFO : Attempting to create tf-idf model.
+2015-05-30 17:20:02,339 : INFO : Tf-idf model does not yet exist for the current hash. Creating now.
+2015-05-30 17:20:02,339 : INFO : Attempting to convert current corpus to the Tf-idf model.
+2015-05-30 17:20:02,339 : INFO : initializing corpus reader from <open file 'thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm', mode 'r' at 0x7f9cac1399c0>
+2015-05-30 17:20:02,339 : INFO : accepted corpus with 0 documents, 0 features, 0 non-zero entries
+2015-05-30 17:20:02,339 : WARNING : constructor received both corpus and explicit inverse document frequencies; ignoring the corpus
+2015-05-30 17:20:02,339 : INFO : saving TfidfModel object under thinking/braintfidf/051bfddb-9b06-4da6-9884-c77fc4b90d73.tfidf_model, separately None
+2015-05-30 17:20:02,358 : INFO : Tf-idf model created, saved in tfidf_model format.
