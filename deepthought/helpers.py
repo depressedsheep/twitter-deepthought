@@ -19,17 +19,17 @@ class S3Bucket(object):
 
     def __init__(self, bucket_name='twitter-deepthought'):
         # Authenticate with Amazon S3
-        logging.info("Authenticating with Amazon S3")
+        logging.debug("Authenticating with Amazon S3")
         self.conn = S3Connection(boto_access, boto_secret)
 
         # Check that bucket actually exists
-        logging.info("Checking if bucket '" + bucket_name + "' exists")
+        logging.debug("Checking if bucket '" + bucket_name + "' exists")
         exists = self.conn.lookup(bucket_name)
         if exists is None:
             raise ValueError("No such bucket")
 
         # If bucket exist, get it
-        logging.info("Accessing bucket '" + bucket_name + "'")
+        logging.debug("Accessing bucket '" + bucket_name + "'")
         self.bucket = self.conn.get_bucket(bucket_name)
 
     def list_keys(self):
@@ -37,7 +37,7 @@ class S3Bucket(object):
         List the keys in this bucket
         :return: List of keys
         """
-        logging.info("Listing keys in bucket '" + self.bucket.name + "'")
+        logging.debug("Listing keys in bucket '" + self.bucket.name + "'")
         return list(self.bucket.list())
 
     def list_recent_keys(self, num):
@@ -54,6 +54,19 @@ class S3Bucket(object):
 
         # Return the last X number of keys
         return list(reversed(key_list[-num:]))
+
+    def find_key(self, key_name):
+        """
+        Given the name of a key, iterate through all keys in this bucket
+        and return specified key. Else, return none
+        :param key_name: Name of the key to be searched for
+        :return:
+        """
+        logging.debug("Finding key with name of '" + key_name + "'")
+        for key in self.list_keys():
+            if key_name in key.name:
+                return key
+        return None
 
     def upload(self, file_path, key=""):
         """
@@ -93,7 +106,7 @@ def decompress_dir(file_path):
     Unzip and decompress a dir and its files
     :param file_path: Path to the zipped dir
     """
-    logging.info("Decompressing " + file_path)
+    logging.info("Unpacking " + file_path)
     # Load the zip file
     ziph = zipfile.ZipFile(file_path, "r")
 
@@ -145,3 +158,13 @@ def upload_dir(dir_path, key=None):
         logging.error("Upload of " + file_path + " failed!")
     # Delete file after upload
     os.remove(file_path)
+
+
+def read_file_in_chunks(file_object, chunk_size=1000000):
+    """ Generator to read a file piece by piece.
+    Default chunk size: 1MB """
+    while True:
+        data = file_object.read(chunk_size)
+        if not data:
+            break
+        yield data
