@@ -13,12 +13,12 @@ class librarian(object):
 		self.dirs = {
 		#'dict':os.path.join(os.path.dirname(__file__) + '/../thinking/braindict',  self.fname),
 		#'dump':os.path.join(os.path.dirname(__file__) + '/../thinking/braindump', self.fname),
-		'in':os.path.join(os.path.dirname(__file__) + '/../thinking/braindump'),
-		'flib':os.path.join(os.path.dirname(__file__) + '/../thinking/hashbrowns')
+		'in':os.path.join('thinking','braindump'),
+		'flib':os.path.join('thinking','hashbrowns')
 		}
 	def update_dir(self):
-		self.dirs['dict'] = os.path.join(os.path.dirname(__file__) + '/../thinking/braindict',  self.fname)
-		self.dirs['dump'] = os.path.join(os.path.dirname(__file__) + '/../thinking/braindump', self.fname)
+		self.dirs['dict'] = os.path.join('thinking','braindict',  self.fname)
+		self.dirs['dump'] = os.path.join('thinking','braindump', self.fname)
 		#print self.dirs
 		#print self.fname
 	def merge(self):
@@ -58,8 +58,8 @@ class librarian(object):
 
 
 	def gen(self):
-		self.dirs['dict'] = os.path.join(os.path.dirname(__file__) + '/../thinking/braindict',  self.fname)
-		self.dirs['dump'] = os.path.join(os.path.dirname(__file__) + '/../thinking/braindump', self.fname)
+		self.dirs['dict'] = os.path.join('thinking','braindict',  self.fname)
+		self.dirs['dump'] = os.path.join('thinking','braindump', self.fname)
 
 		self.f_dict = open(self.dirs['dict'],'w')
 		self.f_text = open(self.dirs['dump'],'r')

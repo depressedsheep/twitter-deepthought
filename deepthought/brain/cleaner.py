@@ -12,12 +12,13 @@ stop = stopwords.words('english')
 
 class launch(object):
 	def __init__(self, key, queue):
+
 		self.conn = S3Connection(boto_access, boto_secret)
 		self.bucket = self.conn.get_bucket('twitter-deepthought')
 		self.k = Key(self.bucket)
 		self.z = False
 		if not any([key == z.name for z in self.bucket.list()]):
-			key = 'z' + key
+			key = key + '.zip'
 			print "Using the newer zipped file. Meows."
 			self.z = True
 		self.key = key
@@ -26,10 +27,9 @@ class launch(object):
 		print "[{}] This module loads and cleans a compressed file.".format(self.key)
 		
 		self.dirs = {
-		'dump':os.path.join('/../thinking/braindump', self.key),
-		'raw':os.path.join('')
+		'dump':os.path.join('thinking/braindump', self.key),
 		}
-		self.f_text = open(os.path.dirname(__file__) + self.dirs['dump'], 'w')
+		self.f_text = open(self.dirs['dump'], 'w')
 		self.t_stop = ['rt', '#','http', '@']		
 		queue.put(True)
 	def load(self):

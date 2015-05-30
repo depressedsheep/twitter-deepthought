@@ -1,0 +1,11 @@
+2015-05-30 17:00:48,763 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:00:57,389 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:00:57,413 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:00:57,413 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:00:57,413 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
+2015-05-30 17:01:11,434 : INFO : test post pls ignore
+2015-05-30 17:01:11,434 : INFO : Hashbrown does not exist yet.
+2015-05-30 17:01:19,903 : INFO : built Dictionary(0 unique tokens: []) from 0 documents (total 0 corpus positions)
+2015-05-30 17:01:19,978 : INFO : storing corpus in Matrix Market format to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:01:19,978 : INFO : saving sparse matrix to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm
+2015-05-30 17:01:19,979 : INFO : saving MmCorpus index to thinking/braincorp/051bfddb-9b06-4da6-9884-c77fc4b90d73.mm.index
