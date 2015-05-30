@@ -7,10 +7,11 @@ import bz2
 import threading
 import logging
 import pprint
+import socket
 import shutil
 import sys
 import helpers
-from config import ck, cs, ot, ots, public_dir
+import config
 
 module_logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def init_twitter_api():
     """ Initializes a Twitter API object """
     module_logger.debug("Initializing Twitter API")
     # Authenticate with twitter api
-    auth = twitter.oauth.OAuth(ot, ots, ck, cs)
+    auth = twitter.oauth.OAuth(config.ot, config.ots, config.ck, config.cs)
     twitter_api = twitter.Twitter(auth=auth)
     return twitter_api
 
@@ -36,6 +37,8 @@ class Crawler(object):
         tweets_file         The current file where tweets are being stored
         tps_file            The current file where Tweets Per Second are being recorded
         queue               The shared queue with the Spike thread for analysing files
+        socket              The UDP socket used to send the current crawler status
+        status              The current status of the crawler
     """
 
     total_tweets = 0
@@ -46,6 +49,8 @@ class Crawler(object):
     tweets_file = None
     tps_file = None
     queue = None
+    socket = None
+    status = {}
 
     def __init__(self):
         """ Initializes class attributes
@@ -62,6 +67,23 @@ class Crawler(object):
         # Initializes the directory the crawler is going to write to
         self.init_dir()
 
+        # Initializes the UDP socket
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            logging.debug("Socket created")
+        except socket.error, msg:
+            logging.error("Failed to create socket. Message: " + msg[1])
+            raise
+
+        # Bind socket to host and port
+        try:
+            self.socket.bind((config.udp_host, config.udp_port))
+        except socket.error, msg:
+            logging.error("Bind failed. Message: " + msg[1])
+            raise
+        logging.debug("Socket bind completed.")
+
+
     def start(self, queue):
         """
         Main function to start the collection of tweets
@@ -77,6 +99,9 @@ class Crawler(object):
 
         # Initial call to update status
         self.update_status()
+
+        # Start status UDP server
+        self.send_status()
 
         # Iterate tweets
         try:
@@ -99,6 +124,7 @@ class Crawler(object):
         """ Do cleanup work
         """
         self.logger.warn('Crawling stopped/interrupted')
+        self.socket.close()
         self.tweets_file.close()
         self.tps_file.close()
 
@@ -116,7 +142,7 @@ class Crawler(object):
         # Calculate time elapsed
         elapsed_time = datetime.datetime.now() - self.start_time
 
-        status = {
+        self.status = {
             'duration': int(elapsed_time.total_seconds()),
             'total_tweets': self.total_tweets,
             'tps': self.tps,
@@ -124,19 +150,18 @@ class Crawler(object):
             'tweets_file_size': os.path.getsize(self.tweets_file.name),
         }
 
-        # Logs to console
-        # self.logger.debug("\n" + pprint.pformat(status) + "\n")
-
-        # Update status to front end
-        with open(public_dir + "status.json", 'w') as f:
-            f.write(json.dumps(status))
-
         # Update tps file
         timestamp = str(time.time())
         self.tps_file.write("\"" + timestamp + "\":" + str(self.tps) + ',')
 
         # Reset counter for tweets per second
         self.tps = 0
+
+    def send_status(self):
+        while True:
+            addr = self.socket.recvfrom(1024)[1]
+            reply = json.dumps(self.status)
+            self.socket.sendto(reply, addr)
 
     def change_dir(self):
         """ Change the dir the crawler is writing to
@@ -197,7 +222,7 @@ class Crawler(object):
 
                 # Read the original file chunk by chunk, due to memory limitations
                 # Chunk size is set to 1MB
-                chunk_size = 1024*1024
+                chunk_size = 1024 * 1024
                 for chunk in helpers.read_file_in_chunks(original_f, chunk_size):
                     # If this is a JSON file and the current chunk is the last chunk in the file,
                     # we remove the trailing comma from the original file
