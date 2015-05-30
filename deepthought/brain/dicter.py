@@ -18,15 +18,18 @@ class librarian(object):
 		'in':os.path.join('thinking','braindump'),
 		'flib':os.path.join('thinking','hashbrowns')
 		}
+
 	def update_dir(self):
 		self.dirs['dict'] = os.path.join('thinking','braindict',  self.fname)
 		self.dirs['dump'] = os.path.join('thinking','braindump', self.fname)
 		#print self.dirs
 		#print self.fname
 	def merge(self):
+		logging.info("Merging Files now.")
 		self.update_dir()
 		self.f_text = open(self.dirs['dump'], 'w')
 		for key in self.key_list:
+			print key
 			f = open(os.path.join(self.dirs['in'], key), 'r')
 			for line in f:
 				self.f_text.write(line)
@@ -36,25 +39,26 @@ class librarian(object):
 		food = {}
 		cake = '.'.join(self.key_list) 
 		food[cake] = self.uname
-		if not os.path.exists(self.dirs['flib']):			
-			logging.info("Cooking a new hashbrown.")
+		if not os.path.exists(self.dirs['flib']):
+			logging.info("Cooking a new hashbrown.")			
 			#print cake
 			self.fname = self.uname
-			self.merge()
 			pickle.dump(food, open(self.dirs['flib'], 'w'))
+			self.merge()	
 			
-		else:
+		else: #hash file already exists
 			cfood = pickle.load(open(self.dirs['flib'], 'r'))
 			print cfood
 			if cake in cfood:
 				logging.info("Hashbrown already exists.")
 				self.fname = cfood[cake]
 			else:
-				logging.info("Cooking a new hashbrown.")
+				logging.info("Hashbrown exists, but hash doesn't.")
 				cfood[cake] = self.uname
 				self.fname = self.uname
 				pickle.dump(cfood, open(self.dirs['flib'], 'w'))
 				self.merge()
+
 		logging.info("Hashbrown done.")
 		return self.fname
 

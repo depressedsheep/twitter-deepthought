@@ -30,8 +30,6 @@ def main():
     d = deepthought(t_list)
     d.start()
     d.create_dict()
-    d.create_corpus()
-    d.create_tfidf()
 
 def gen_date(parameters):
     """ Parameters is a dictionary with the below tuples, printing the possible filenames for the hours in the time range.
@@ -79,11 +77,7 @@ class deepthought(object):
             'tfidf': os.path.join('thinking', 'braintfidf'),
             'lsi': os.path.join('thinking', 'brainlsi')
         }
-        try:
-            self.fname = self.get_hashbrown()
-        except:
-            logging.info("Hashbrown does not exist yet.")
-
+        #self.fname = self.get_hashbrown()
     def start(self):
         """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
         logging.info("Download started.")
@@ -100,9 +94,10 @@ class deepthought(object):
         self.ensure_dir(self.dirs['load'])
         p = brain.cleaner.launch(key, queue)
         p.load()
-        # p.sweep()
+        p.sweep()
 
     def get_hashbrown(self):
+        print os.path.abspath(os.curdir)
         """ Get the generated hash for the selected file list. """
         f = pickle.load(open(os.path.join('thinking', 'hashbrowns'), 'rb'))
         return f['-'.join(self.key_list)]
@@ -162,14 +157,13 @@ class deepthought(object):
             self.lsi_creator()
 
     def lsi_creator(self, document_size=1000):
-        self.f_corp = open(os.path.join(self.dirs['corp'], self.filename + '.mm'), 'r')
+        self.f_corp = open(os.path.join(self.dirs['corp'], self.fname + '.mm'), 'r')
         self.corpus = corpora.MmCorpus(self.f_corp)
 
         self.tfidf = models.TfidfModel.load(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
         self.corpus_tfidf = self.tfidf[self.corpus]
 
-        print self.tfidf
         self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.fname)))
         self.lsi = models.LsiModel(self.corpus_tfidf, id2word=self.dict, num_topics=200)
         self.corpus_lsi = self.lsi[self.corpus_tfidf]  # double wrapper over the original corpus
@@ -191,7 +185,6 @@ class deepthought(object):
         bucket = conn.get_bucket('twitter-deepthought')
         for z in bucket.list():
             print z.name
-
 
 if __name__ == '__main__':
     main()
