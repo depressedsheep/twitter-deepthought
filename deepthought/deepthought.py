@@ -1,8 +1,3 @@
-#
-# Main analysis module for compressed files. Imports crawler.py and aims to define functions 
-# to parse and analyse the tweets in various ways, most probably with gensim
-# 
-
 from gensim import corpora, models, similarities
 import logging
 import os
@@ -30,31 +25,28 @@ def main():
         '31-03-2015_03'
     ]
     t_list.sort(key=lambda x: gen_dto(x))
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')    
+
     d = deepthought(t_list)
     d.start()
     d.create_dict()
     d.create_corpus()
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')
-
+    d.create_tfidf()
 
 def gen_date(parameters):
-    # parameters as a dictionary
-    # 'months': (11,12)
-    # 'days': (12, 19)
-    # 'years': (2015, 2015) for consistency
-    # 'hours': (15,19)
-    # return a list
-    a = datetime.datetime(parameters['years'][0], parameters['months'][0], parameters['days'][0],
-                          parameters['hours'][0])
-    b = datetime.datetime(parameters['years'][1], parameters['months'][1], parameters['days'][1],
-                          parameters['hours'][1])
+    """ Parameters is a dictionary with the below tuples, printing the possible filenames for the hours in the time range.
+    :params
+        'months': (11,12)
+        'days': (12, 19)
+        'years': (2015, 2015)
+        'hours': (15,19) """
+    a = datetime.datetime(parameters['years'][0], parameters['months'][0], parameters['days'][0],parameters['hours'][0])
+    b = datetime.datetime(parameters['years'][1], parameters['months'][1], parameters['days'][1],parameters['hours'][1])
     c = b - a
     no_h = divmod(c.days * 86400 + c.seconds, 3600)[0]
     date_list = [b - datetime.timedelta(hours=x) for x in xrange(0, no_h)]
-    date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y=x.strftime('%Y'), m=x.strftime('%m'), d=x.strftime('%d'),
-                                                       h=x.strftime('%H')), date_list)
+    date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y=x.strftime('%Y'), m=x.strftime('%m'), d=x.strftime('%d'),h=x.strftime('%H')), date_list)
     return date_list
-
 
 def gen_dto(date):
     # e.g. '31-03-2015_02'
@@ -67,16 +59,17 @@ def gen_dto(date):
     t = datetime.datetime(d[0], d[1], d[2], d[3])
     return t
 
-
-# this part assumes loading from boto
 class deepthought(object):
+    """
+    Primary analysis module, downloading from Amazon S3, applying Natural Language Processing to it.    
+    Working directory is moved to root directory out of convenience.
+    """
     def __init__(self, key_list):
-
         self.key_list = key_list
-        print "Requesting " + str(self.key_list)
-
-        self.t_stop = ['rt', '#', 'http',
-                       '@']  # this is an arbitary stop list, and will change depending on analysis goals
+        logging.info("Requesting " + str(self.key_list))
+        logging.info("Current working directory: " + os.path.abspath(os.curdir))
+        self.t_stop = ['rt', '#', 'http','@']  
+        os.chdir("..")
         self.dirs = {
             'load': 'thinking',
             'dump': os.path.join('thinking', 'braindump'),
@@ -86,18 +79,14 @@ class deepthought(object):
             'tfidf': os.path.join('thinking', 'braintfidf'),
             'lsi': os.path.join('thinking', 'brainlsi')
         }
-        """self.fp = {
-        'lsi': os.path.join(self.dirs['lsi'], self.key + '.lsi'),
-        'tfidf': os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model'),
-        'corp': os.path.join(self.dirs['corp'], self.key + '.mm')
-        }"""
         try:
             self.fname = self.get_hashbrown()
         except:
-            pass
+            logging.info("Hashbrown does not exist yet.")
 
     def start(self):
-        print "Download started."
+        """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
+        logging.info("Download started.")
         queue = multiprocessing.Queue()
         jobs = []
         for key in self.key_list:
@@ -107,16 +96,14 @@ class deepthought(object):
             queue.get()
             p.join()
 
-    # self.create_dict()
-
     def fetch(self, key, queue):
         self.ensure_dir(self.dirs['load'])
         p = brain.cleaner.launch(key, queue)
         p.load()
-
         # p.sweep()
 
     def get_hashbrown(self):
+        """ Get the generated hash for the selected file list. """
         f = pickle.load(open(os.path.join('thinking', 'hashbrowns'), 'rb'))
         return f['-'.join(self.key_list)]
 
@@ -134,7 +121,8 @@ class deepthought(object):
     def create_tfidf(self, force=False):
         logging.info("Attempting to create tf-idf model.")
         self.ensure_dir(self.dirs['tfidf'])
-        if not os.path.exists(os.path.join(self.dirs['tfidf'], self.key + '.tfidf_model')):
+        if not os.path.exists(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model')):
+            logging.info("Tf-idf model does not yet exist for the current hash. Creating now.")
             self.tfidf_creator()
         else:
             if force == True:
@@ -144,16 +132,14 @@ class deepthought(object):
                 logging.info("Tf-idf model already created. Set force to True to create again.")
 
     def tfidf_creator(self):
-        logging.info("Attempting to convert current corpus to the Tf-idf model...")
-        self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+        logging.info("Attempting to convert current corpus to the Tf-idf model.")
+        self.f_corp = open(os.path.join(self.dirs['corp'], self.fname + '.mm'), 'r')
         self.corpus = corpora.MmCorpus(self.f_corp)
         # print self.corpus
 
-        self.tfidf = models.TfidfModel(corpus=self.corpus,
-                                       dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.key))))
+        self.tfidf = models.TfidfModel(corpus=self.corpus, dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.fname))))
         self.corpus_tfidf = self.tfidf[self.corpus]
-        print self.tfidf
-        self.tfidf.save(self.fp['tfidf'])
+        self.tfidf.save(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
         logging.info("Tf-idf model created, saved in tfidf_model format.")
 
@@ -165,7 +151,7 @@ class deepthought(object):
         # Currently not very sure, but I'm guessing you'd add an option into the vector generator function to use the 'master' dict, and then add into the LSA structure
         #
         self.ensure_dir(self.dirs['lsi'])
-        if os.path.exists(self.fp['lsi']):
+        if os.path.exists(os.path.join(self.dirs['lsi'],self.fname + '.lsi')):
             if force == True:
                 logging.info("Forced to create LSI/LSA model again.")
                 self.lsi_creator()
@@ -176,24 +162,23 @@ class deepthought(object):
             self.lsi_creator()
 
     def lsi_creator(self, document_size=1000):
-        self.f_corp = open(os.path.join(self.dirs['corp'], self.key + '.mm'), 'r')
+        self.f_corp = open(os.path.join(self.dirs['corp'], self.filename + '.mm'), 'r')
         self.corpus = corpora.MmCorpus(self.f_corp)
 
-        self.tfidf = models.TfidfModel.load(self.fp['tfidf'])
+        self.tfidf = models.TfidfModel.load(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
         self.corpus_tfidf = self.tfidf[self.corpus]
 
         print self.tfidf
-        self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.key)))
+        self.dict = pickle.load(open(os.path.join(self.dirs['dict'], self.fname)))
         self.lsi = models.LsiModel(self.corpus_tfidf, id2word=self.dict, num_topics=200)
         self.corpus_lsi = self.lsi[self.corpus_tfidf]  # double wrapper over the original corpus
         self.lsi.print_topics(5)
-        self.lsi.save(self.fp['lsi'])
+        self.lsi.save(os.path.join(self.dirs['lsi'], self.fname + '.lsi'))
         logging.info("LSA model created.")
 
     def display_lsi(self, n=10):
-
-        self.lsi = models.LsiModel.load(self.fp['lsi'])
+        self.lsi = models.LsiModel.load(os.path.join(self.dirs['lsi'], self.fname + '.lsi'))
         self.lsi.print_debug(n)
 
     def ensure_dir(self, f):

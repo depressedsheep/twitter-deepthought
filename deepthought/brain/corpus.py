@@ -1,10 +1,11 @@
 from gensim import corpora, models, similarities
 import os
 import cPickle as pickle
-
+import logging
 class blobbify(object):
 	def __init__(self, key):
-		print "Initialised brain.corpus.blobbify()"
+		logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)  
+		logging.info("Initialised brain.corpus.blobbify()")
 		self.key = key
 
 		self.dirs = {
@@ -18,6 +19,6 @@ class blobbify(object):
 		self.dict = pickle.load(self.f_dict)
 		corpora.MmCorpus.serialize(self.dirs['corp'], [self.dict.doc2bow(line.split(' ')) for line in self.f_text])
 	
-		print 'MMCorpus file created at ' + self.dirs['corp']
+		logging.info('MMCorpus file created at ' + self.dirs['corp'])
 		self.f_text.close()
 		self.f_dict.close()
