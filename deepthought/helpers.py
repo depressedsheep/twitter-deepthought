@@ -3,8 +3,10 @@ from boto.s3.key import Key
 from config import boto_access, boto_secret
 import logging
 import zipfile
-import zlib
+import bz2
 import os
+
+module_logger = logging.getLogger(__name__)
 
 
 class S3Bucket(object):
@@ -18,18 +20,21 @@ class S3Bucket(object):
     bucket = None
 
     def __init__(self, bucket_name='twitter-deepthought'):
+        # Intialize logger
+        self.logger = logging.getLogger(__name__)
+
         # Authenticate with Amazon S3
-        logging.debug("Authenticating with Amazon S3")
+        self.logger.debug("Authenticating with Amazon S3")
         self.conn = S3Connection(boto_access, boto_secret)
 
         # Check that bucket actually exists
-        logging.debug("Checking if bucket '" + bucket_name + "' exists")
+        self.logger.debug("Checking if bucket '" + bucket_name + "' exists")
         exists = self.conn.lookup(bucket_name)
         if exists is None:
             raise ValueError("No such bucket")
 
         # If bucket exist, get it
-        logging.debug("Accessing bucket '" + bucket_name + "'")
+        self.logger.debug("Accessing bucket '" + bucket_name + "'")
         self.bucket = self.conn.get_bucket(bucket_name)
 
     def list_keys(self):
@@ -37,7 +42,7 @@ class S3Bucket(object):
         List the keys in this bucket
         :return: List of keys
         """
-        logging.debug("Listing keys in bucket '" + self.bucket.name + "'")
+        self.logger.debug("Listing keys in bucket '" + self.bucket.name + "'")
         return list(self.bucket.list())
 
     def list_recent_keys(self, num):
@@ -62,7 +67,7 @@ class S3Bucket(object):
         :param key_name: Name of the key to be searched for
         :return:
         """
-        logging.debug("Finding key with name of '" + key_name + "'")
+        self.logger.debug("Finding key with name of '" + key_name + "'")
         for key in self.list_keys():
             if key_name in key.name:
                 return key
@@ -81,7 +86,7 @@ class S3Bucket(object):
         k = Key(self.bucket)
         k.key = key
 
-        logging.info("Uploading " + file_path)
+        self.logger.info("Uploading " + file_path)
 
         # Try to upload the file
         try:
@@ -96,41 +101,52 @@ class S3Bucket(object):
         :param key: Unique key
         :return File path to downloaded file
         """
-        logging.info("Downloading " + key.name)
+        module_logger.info("Downloading " + key.name)
         key.get_contents_to_filename(key.name)
         return key.name
 
 
-def decompress_dir(file_path):
+def unpack(file_path):
     """
     Unzip and decompress a dir and its files
     :param file_path: Path to the zipped dir
     """
-    logging.info("Unpacking " + file_path)
+    module_logger.info("Unpacking " + file_path)
     # Load the zip file
     ziph = zipfile.ZipFile(file_path, "r")
 
-    # Make new dir to store decompressed files
-    dir_name = os.path.splitext(file_path)[0]
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-
-    for file_name in ziph.namelist():
-        # Read the compressed contents into a string
-        compressed_contents = ziph.read(file_name)
-        # Decompress the string
-        decompressed_contents = zlib.decompress(compressed_contents, 16 + zlib.MAX_WBITS)
-        # Remove the '.gz' extension for the new file path
-        new_file_path = os.path.splitext(file_name)[0]
-        # Write the decompressed contents to the new file
-        with open(new_file_path, "w") as f:
-            f.write(decompressed_contents)
+    # Extract all files in the Zipfile
+    ziph.extractall()
 
     # Close the zipfile handle
     ziph.close()
 
-    # Remove the old zipped dir
+    # Delete the zip file
     os.remove(file_path)
+
+    # Get dir where unzipped files are stored
+    dir = os.path.splitext(file_path)[0]
+
+    for root, dirs, files in os.walk(dir):
+        for name in files:
+            # Get the file path of current file
+            file_path = os.path.join(root, name)
+
+            # Open the original file and the compressed file
+            original_f = open(os.path.splitext(file_path)[0], 'wb')
+            compressed_f = bz2.BZ2File(file_path, 'rb')
+
+            # Read the compressed file chunk by chunk (chunk size of 1MB)
+            # and write the uncompressed contents into a new file
+            for data in iter(lambda: compressed_f.read(1024 * 1024), b''):
+                original_f.write(data)
+
+            # Close both files
+            original_f.close()
+            compressed_f.close()
+
+            # Remove the old, compressed file
+            os.remove(file_path)
 
 
 def upload_dir(dir_path, key=None):
@@ -155,12 +171,12 @@ def upload_dir(dir_path, key=None):
     try:
         bucket.upload(file_path, key)
     except:
-        logging.error("Upload of " + file_path + " failed!")
+        module_logger.error("Upload of " + file_path + " failed!")
     # Delete file after upload
     os.remove(file_path)
 
 
-def read_file_in_chunks(file_object, chunk_size=1000000):
+def read_file_in_chunks(file_object, chunk_size=1024 * 1024):
     """ Generator to read a file piece by piece.
     Default chunk size: 1MB """
     while True:

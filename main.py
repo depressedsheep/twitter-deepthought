@@ -1,6 +1,7 @@
 import deepthought.config
 import deepthought.crawler
 import deepthought.spike
+import deepthought.helpers
 import logging
 import threading
 import os
@@ -8,15 +9,31 @@ from time import strftime
 
 
 def main():
-    # Set up logging to file and console
+    # Init logging
+    init_logging()
 
+    # Run spike detector
+    s = deepthought.spike.SpikeDetector()
+    st = threading.Thread(target=s.find_spikes)
+    st.start()
+
+    # Run crawler
+    c = deepthought.crawler.Crawler()
+    ct = threading.Thread(target=c.start)
+    ct.start()
+
+
+def init_logging():
+    """
+    Initialize logging to file and console
+    """
     # Create format for logging
     log_formatter = logging.Formatter(
-        fmt="[%(levelname)s] [%(asctime)s] [%(module)s.%(funcName)s]: %(message)s",
+        fmt="[%(levelname)s] [%(asctime)s] [%(name)s]: %(message)s",
         datefmt="%m/%d/%Y %I:%M %p")
-    # Create logger with 'deepthought'
-    logger = logging.getLogger('deepthought')
-    logger.setLevel(logging.DEBUG)
+    # Get root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
     # Check if log dir exists, else create it
     log_dir = deepthought.config.log_dir
@@ -38,18 +55,8 @@ def main():
     console_handler.setLevel(logging.INFO)
 
     # Add the handlers to the logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
-
-    # Run spike detector
-    s = deepthought.spike.SpikeDetector()
-    st = threading.Thread(target=s.find_spikes)
-    st.start()
-
-    # Run crawler
-    c = deepthought.crawler.Crawler()
-    ct = threading.Thread(target=c.start)
-    ct.start()
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
 
 
 if __name__ == '__main__':

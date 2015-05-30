@@ -3,18 +3,21 @@ import time
 import datetime
 import json
 import twitter
-import gzip
+import bz2
 import threading
 import logging
 import pprint
 import shutil
+import sys
 import helpers
 from config import ck, cs, ot, ots, public_dir
+
+module_logger = logging.getLogger(__name__)
 
 
 def init_twitter_api():
     """ Initializes a Twitter API object """
-    logging.debug("Initializing Twitter API")
+    module_logger.debug("Initializing Twitter API")
     # Authenticate with twitter api
     auth = twitter.oauth.OAuth(ot, ots, ck, cs)
     twitter_api = twitter.Twitter(auth=auth)
@@ -39,15 +42,18 @@ class Crawler(object):
     start_time = datetime.time()
     stream = twitter.TwitterStream()
     dir = ""
-    tweets_file = gzip.GzipFile
-    tps_file = gzip.GzipFile
+    tweets_file = None
+    tps_file = None
 
     def __init__(self):
         """ Initializes class attributes
         """
+        # Initialize logging
+        self.logger = logging.getLogger(__name__)
+
         # Initializes a Twitter Stream
         twitter_api = init_twitter_api()
-        logging.debug("Initializing Twitter Stream")
+        self.logger.debug("Initializing Twitter Stream")
         self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
             .statuses.sample(language='en')
 
@@ -56,7 +62,7 @@ class Crawler(object):
 
     def start(self):
         """ Main function to start the collection of tweets """
-        logging.info("Started crawling")
+        self.logger.info("Started crawling")
 
         # Mark start time
         self.start_time = datetime.datetime.now()
@@ -78,13 +84,13 @@ class Crawler(object):
                 # If the current directory name is outdated
                 if self.dir != time.strftime('%d-%m-%Y_%H'):
                     self.change_dir()
-        except StopIteration:
-            logging.error("Tweet stream stopped unexpectedly")
+        except:
+            self.logger.error("Tweet stream stopped unexpectedly")
 
     def __del__(self):
         """ Do cleanup work
         """
-        logging.warn('Crawling stopped/interrupted')
+        self.logger.warn('Crawling stopped/interrupted')
         self.tweets_file.close()
         self.tps_file.close()
 
@@ -110,7 +116,7 @@ class Crawler(object):
         }
 
         # Logs to console
-        logging.debug("\n" + pprint.pformat(status) + "\n")
+        self.logger.debug("\n" + pprint.pformat(status) + "\n")
 
         # Update status to front end
         with open(public_dir + "status.json", 'w') as f:
@@ -128,7 +134,7 @@ class Crawler(object):
             and starts processing previous hour's dir
         """
         if self.dir != time.strftime('%d-%m-%Y_%H'):
-            logging.info("Changing dir from " + self.dir + " to " + time.strftime('%d-%m-%Y_%H'))
+            self.logger.info("Changing dir from " + self.dir + " to " + time.strftime('%d-%m-%Y_%H'))
 
             # Close the old files to allow processing
             self.tweets_file.close()
@@ -144,13 +150,13 @@ class Crawler(object):
     def init_dir(self):
         """ Initializes the directory the crawler is going to write to
         """
-        logging.debug("Initializing dir")
+        self.logger.debug("Initializing dir")
         self.dir = time.strftime('%d-%m-%Y_%H')
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
-        self.tweets_file = open(self.dir + '/tweets.json', 'ab')
-        self.tps_file = open(self.dir + '/tps.json', 'ab')
+        self.tweets_file = open(self.dir + '/tweets.json', 'ab', 0)
+        self.tps_file = open(self.dir + '/tps.json', 'ab', 0)
 
     @staticmethod
     def process_dir(dir):
@@ -160,26 +166,40 @@ class Crawler(object):
         :param dir: The name of dir to process
         :return:
         """
-        logging.info("Processing dir " + dir)
+        module_logger.info("Processing dir " + dir)
         # Loop through each file in the directory
         for root, dirs, files in os.walk(dir):
             for name in files:
+                # Get the file path of current file
                 file_path = os.path.join(root, name)
 
-                # Read the contents of the file
+                # Open the original file and the compressed file
                 original_f = open(file_path)
-                for chunk in helpers.read_file_in_chunks(original_f):
-                    print chunk
-                contents = original_f.read()
-                original_f.close()
+                compressed_f = bz2.BZ2File(file_path + '.bz2', 'w')
 
-                # Process JSON files
+                # If the current file is a JSON file, we have to format it
+                # First, we prepend a '{'
                 if ".json" in name:
-                    contents = '{' + contents[:-1] + '}'
+                    compressed_f.write("{")
 
-                # Compress and write the contents to a new file
-                compressed_f = gzip.open(file_path + '.gz', 'wb')
-                compressed_f.write(contents)
+                # Read the original file chunk by chunk, due to memory limitations
+                # Chunk size is set to 1MB
+                chunk_size = 1024*1024
+                for chunk in helpers.read_file_in_chunks(original_f, chunk_size):
+                    # If this is a JSON file and the current chunk is the last chunk in the file,
+                    # we remove the trailing comma from the original file
+                    # We can tell if this is the last chunk as the chunk size will be smaller than what we asked for
+                    if ".json" in name and sys.getsizeof(chunk) < chunk_size:
+                        compressed_f.write(chunk[:-1])
+                    else:
+                        compressed_f.write(chunk)
+
+                # Lastly, we prepend a '}'
+                if ".json" in name:
+                    compressed_f.write("}")
+
+                # Close both files
+                original_f.close()
                 compressed_f.close()
 
                 # Remove the old, uncompressed file

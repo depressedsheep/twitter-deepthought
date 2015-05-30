@@ -13,22 +13,25 @@ class SpikeDetector(object):
     """ Find if any spikes occurred every hour
     """
 
+    def __init__(self):
+        # Intialize logger
+        self.logger = logging.getLogger(__name__)
+
     def find_spikes(self):
         """
         At every hour, attempt to find the spikes that occurred within that hour by calculating EMA,
         EMA growth and then checking if said growth exceeds the threshold
         """
-        logging.info("Starting spike detection")
+        self.logger.info("Starting spike detection")
         # Call this function again one hour from now
         t = threading.Timer(60 * 60, self.find_spikes)
         t.start()
 
         # Download and unpack the latest file added to the bucket
         bucket = helpers.S3Bucket()
-        # key = bucket.list_recent_keys(1)[0]
-        key = bucket.find_key("29-05-2015_08")
+        key = bucket.list_recent_keys(1)[0]
         fp = bucket.download(key)
-        helpers.decompress_dir(fp)
+        helpers.unpack(fp)
         # Remove the .zip extension from the dir path
         fp = os.path.splitext(fp)[0]
         # Load the TPS data from the current hour into the dict
@@ -77,8 +80,7 @@ class SpikeDetector(object):
                 growth[timestamp] = current_growth
                 # Check if growth exceeded the threshold to be considered a spike
                 if current_growth >= spike_threshold:
-                    logging.info(
-                        "Spike found with growth of " + str(round(current_growth, 2)))
+                    self.logger.info("Spike found at " + str(timestamp))
                     spikes.append(timestamp)
 
         # Combine the list of dicts into one big OrderedDict
@@ -87,7 +89,7 @@ class SpikeDetector(object):
         ema_graph_fp = public_dir + 'ema.json'
         # Write to said file
         with open(ema_graph_fp, 'w') as f:
-            logging.debug("Writing to " + ema_graph_fp)
+            self.logger.debug("Writing to " + ema_graph_fp)
             f.write(json.dumps(ordered_ema))
 
         # Sort the dict of growths and store it in an OrderedDict
@@ -95,20 +97,20 @@ class SpikeDetector(object):
         # Same operation as above
         growth_graph_fp = public_dir + 'growth.json'
         with open(growth_graph_fp, 'w') as f:
-            logging.debug("Writing to " + growth_graph_fp)
+            self.logger.debug("Writing to " + growth_graph_fp)
             f.write(json.dumps(ordered_growth))
 
         # Sort the dict of tps and store it in an OrderedDict
         ordered_tps = collections.OrderedDict(sorted(tps_dict.items()))
         tps_graph_fp = public_dir + "tps.json"
         with open(tps_graph_fp, 'w') as f:
-            logging.debug("Writing to " + tps_graph_fp)
+            self.logger.debug("Writing to " + tps_graph_fp)
             f.write(json.dumps(ordered_tps))
 
         spikes_fp = public_dir + "spikes.json"
         with open(spikes_fp, 'a') as f:
-            logging.debug("Writing to " + spikes_fp)
+            self.logger.debug("Writing to " + spikes_fp)
             for spike in spikes:
                 f.write(str(spike) + '\n')
 
-        logging.info("Spike detection done for this hour")
+        self.logger.info("Spike detection done for this hour")
