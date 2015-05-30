@@ -1,5 +1,4 @@
 from __future__ import division
-import threading
 from config import public_dir, spike_threshold, ema_length, growth_length
 import json
 import collections
@@ -14,22 +13,34 @@ class SpikeDetector(object):
     """
 
     def __init__(self):
-        # Intialize logger
+        # Initialize logger
         self.logger = logging.getLogger(__name__)
 
-    def find_spikes(self):
+    def start(self, queue):
         """
-        At every hour, attempt to find the spikes that occurred within that hour by calculating EMA,
+        Main function to start analyses of files collected
+        :param queue: Shared queue between Crawler thread and Spike thread of files to be analysed
+        """
+        while True:
+            # Wait until a file is received
+            file_name = queue.get(block=True)
+            self.find_spikes(file_name)
+
+
+    def find_spikes(self, file_name):
+        """
+        Given a file name, attempt to find the spikes that occurred within that hour by calculating EMA,
         EMA growth and then checking if said growth exceeds the threshold
+        :param file_name: Name of file to be analysed
         """
-        self.logger.info("Starting spike detection")
-        # Call this function again one hour from now
-        t = threading.Timer(60 * 60, self.find_spikes)
-        t.start()
+        self.logger.info("Starting spike detection of file '" + file_name + "'")
 
         # Download and unpack the latest file added to the bucket
         bucket = helpers.S3Bucket()
-        key = bucket.list_recent_keys(1)[0]
+        key = bucket.find_key(file_name)
+        if key is None:
+            self.logger.error("'" + file_name + "' was not found in the S3 Bucket")
+            return
         fp = bucket.download(key)
         helpers.unpack(fp)
         # Remove the .zip extension from the dir path
@@ -113,4 +124,4 @@ class SpikeDetector(object):
             for spike in spikes:
                 f.write(str(spike) + '\n')
 
-        self.logger.info("Spike detection done for this hour")
+        self.logger.info("Spike detection done for '" + file_name + "'")

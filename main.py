@@ -5,6 +5,7 @@ import deepthought.helpers
 import logging
 import threading
 import os
+import Queue
 from time import strftime
 
 
@@ -12,15 +13,20 @@ def main():
     # Init logging
     init_logging()
 
-    # Run spike detector
-    s = deepthought.spike.SpikeDetector()
-    st = threading.Thread(target=s.find_spikes)
-    st.start()
+    # Create a shared queue of files to be analysed
+    q = Queue.Queue()
 
     # Run crawler
     c = deepthought.crawler.Crawler()
-    ct = threading.Thread(target=c.start)
+    ct = threading.Thread(target=c.start, args=(q,))
     ct.start()
+    ct.name = "Crawler thread"
+
+    # Run spike detector
+    s = deepthought.spike.SpikeDetector()
+    st = threading.Thread(target=s.start, args=(q,))
+    st.start()
+    st.name = "Spike detector thread"
 
 
 def init_logging():
