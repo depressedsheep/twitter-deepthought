@@ -1,21 +1,15 @@
 from __future__ import division
-from config import public_dir, spike_threshold, ema_length, growth_length
+import config
 import json
 import collections
 import helpers
+import csv
 import os
 import logging
-import shutil
 
 
 class SpikeDetector(object):
-    """ Find if any spikes occurred every hour
-
-    Attributes:
-        fp      The file path to the downloaded dir
-    """
-
-    fp = ""
+    """ Given a dir, find if any spikes occurred """
 
     def __init__(self):
         # Initialize logger
@@ -29,30 +23,33 @@ class SpikeDetector(object):
         while True:
             # Wait until a file path is received
             file_path = file_queue.get(block=True)
-            self.fp = file_path
-            self.find_spikes()
+            self.find_spikes(file_path)
 
-    def find_spikes(self):
+    def find_spikes(self, file_path):
         """
-        Given a file name, attempt to find the spikes that occurred within that hour by calculating EMA,
+        Given a file path, attempt to find the spikes (if any) that occurred within that hour by calculating EMA,
         EMA growth and then checking if said growth exceeds the threshold
-        :param file_name: Name of file to be analysed
+        :param file_path: Path to the dir where data is stored
         """
-        self.logger.info("Starting spike detection of file '" + self.fp + "'")
+        self.logger.info("Starting spike detection of dir '" + file_path + "'")
 
         # Load the TPS data from the file into the dict
-        tps_f = open(os.path.join(self.fp, "tps.json"), 'r')
-        tps_f_contents = tps_f.read()
-        tps_f.close()
-        tps_dict = json.loads(tps_f_contents)
+        tps_f = open(os.path.join(file_path, "tps.csv"), 'r')
+        tps_reader = csv.reader(tps_f)
+        tps_dict = dict(filter(None, tps_reader))
 
         # Convert the timestamps from strings to integers
         tps_dict = {int(float(k)): v for k, v in tps_dict.items()}
 
         # Initialize variables for storing EMA values, growth values, and timestamps of spikes
-        ema = []
+        ema = []  # List is used for EMA as we want stack-like behaviour
         growth = {}
         spikes = {}
+
+        # Get values to be used later from config
+        ema_length = config.ema_length
+        growth_length = config.growth_length
+        spike_threshold = config.spike_threshold
 
         # Calculate variable k, to be used later to calculate EMA
         k = 2 / (ema_length + 1)
@@ -99,46 +96,47 @@ class SpikeDetector(object):
                     self.logger.info("Spike found at " + str(timestamp))
 
                     # Add timestamp and contents of the spike to the list
-                    spikes.append({timestamp: self.find_spike_contents(timestamp)})
+                    spikes[timestamp] = self.find_spike_contents(timestamp, file_path)
 
-        # Dict of file paths to be used later
-        fps = {
-            "ema": os.path.join(self.fp, "ema.json"),
-            "growth": os.path.join(self.fp, "growth.json"),
-            "tps": os.path.join(self.fp, "tps.json"),
-            "spikes": os.path.join(self.fp, "spikes.json")
+        data = {
+            # Combine the list of dicts into one big OrderedDict
+            "ema": collections.OrderedDict((k, v) for d in ema for (k, v) in d.items()),
+
+            # Sort the dict of values and store it in an OrderedDict
+            "growth": collections.OrderedDict(sorted(growth.items())),
+            "tps": collections.OrderedDict(sorted(tps_dict.items())),
+            "spikes": collections.OrderedDict(sorted(spikes.items()))
         }
 
-        # Combine the list of dicts into one big OrderedDict
-        ordered_ema = collections.OrderedDict((k, v) for d in ema for (k, v) in d.items())
-        with open(fps[ema], 'w') as f:
-            self.logger.debug("Writing to " + fps[ema])
-            f.write(json.dumps(ordered_ema))
+        for (stat, values) in data:
+            with open(os.path.join(self.fp, stat + ".csv")) as csvfile:
+                field_names = ['timestamp', stat]
+                writer = csv.DictWriter(csvfile, fieldnames=field_names)
 
-        # Sort the dict of growths and store it in an OrderedDict
-        ordered_growth = collections.OrderedDict(sorted(growth.items()))
-        with open(fps["growth"], 'w') as f:
-            self.logger.debug("Writing to " + fps["growth"])
-            f.write(json.dumps(ordered_growth))
-
-        # Sort the dict of tps and store it in an OrderedDict
-        ordered_tps = collections.OrderedDict(sorted(tps_dict.items()))
-        with open(fps["tps"], 'w') as f:
-            self.logger.debug("Writing to " + fps["tps"])
-            f.write(json.dumps(ordered_tps))
-
-        # Sort the dict of spikes and store it in an OrderedDict
-        ordered_spikes = collections.OrderedDict(sorted(spikes.items()))
-        with open(fps["spikes"], 'w') as f:
-            self.logger.debug("Writing to " + fps["spikes"])
-            f.write(json.dumps(ordered_spikes))
+                writer.writeheader()
+                writer.writerows(values)
 
         self.logger.info("Spike detection done and recorded for '" + self.fp + "'")
 
-    def find_spike_contents(self, timestamp):
+    @staticmethod
+    def find_spike_contents(timestamp, file_path):
         """
         Given the timestamp of the spike, find the contents of tweets during the spike
         :param timestamp: Timestamp when spike happened
+        :param file_path: Path to dir where data is stored
         :return: Returns the top 5 words used in tweets during the spike
         """
-        pass
+        tweets_f = open(os.path.join(file_path, "tweets.csv"))
+        tweets_reader = csv.DictReader(tweets_f)
+        spike_tweets_text = []
+        for tweet in tweets_reader:
+            # 1433131173
+            tweet_timestamp = int(float(tweet['timestamp']))
+            tweet_text = json.loads(tweet['tweet'])['text']
+            if timestamp <= tweet_timestamp <= timestamp + config.spike_contents_sample_size:
+                spike_tweets_text.append(tweet_text)
+            elif tweet_timestamp > timestamp:
+                print tweet_timestamp, timestamp, "breaking"
+                break
+
+        return "placeholder"
