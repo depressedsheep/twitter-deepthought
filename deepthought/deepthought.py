@@ -77,7 +77,7 @@ class deepthought(object):
             'tfidf': os.path.join('thinking', 'braintfidf'),
             'lsi': os.path.join('thinking', 'brainlsi')
         }
-        #self.fname = self.get_hashbrown()
+        self.fname = self.get_hashbrown()
     def start(self):
         """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
         logging.info("Download started.")
@@ -100,7 +100,7 @@ class deepthought(object):
         print os.path.abspath(os.curdir)
         """ Get the generated hash for the selected file list. """
         f = pickle.load(open(os.path.join('thinking', 'hashbrowns'), 'rb'))
-        return f['-'.join(self.key_list)]
+        return f['.'.join(self.key_list)]
 
     def create_dict(self):
         self.ensure_dir(self.dirs['dict'])
