@@ -68,15 +68,7 @@ class deepthought(object):
     def __init__(self):   
         self.t_stop = ['rt', '#', 'http','@']  
         os.chdir("..")
-        self.dirs = {
-            'load': 'thinking',
-            'dump': os.path.join('thinking', 'braindump'),
-            'dict': os.path.join('thinking', 'braindict'),
-            # the last three are kind of redundant, will clear soon. were meant for pickling.
-            'corp': os.path.join('thinking', 'braincorp'),
-            'tfidf': os.path.join('thinking', 'braintfidf'),
-            'lsi': os.path.join('thinking', 'brainlsi')
-        }
+        
     def jumpstart(self, dir, fformat = 'raw'):
         """ Assumes you've already downloaded and extracted the files you want into a directory. 
         Also assumes various file formats: .json, .csv.
@@ -86,7 +78,13 @@ class deepthought(object):
             ctrl: Whether it is user controlled. If it is, it'll not try to download the file from S3"""
 
         logging.info("Current working directory: " + os.path.abspath(os.curdir))
-
+        self.dirs = {
+        'load': os.path.join(dir, 'thinking'),
+        'dump': os.path.join(dir,'thinking','braindump'),
+        'corp':os.path.join(dir,'thinking','braincorp'),
+        'dict':os.path.join(dir,'thinking','braindict'),
+        'lsi':os.path.join(dir,'thinking','brainlsi')
+        }
         queue = multiprocessing.Queue()
         jobs = []
         for filename in os.listdir(dir):
@@ -101,6 +99,16 @@ class deepthought(object):
             p.join()
 
     def start(self, key_list):
+        self.dirs = {
+            'load': 'thinking',
+            'dump': os.path.join('thinking', 'braindump'),
+            'dict': os.path.join('thinking', 'braindict'),
+            # the last three are kind of redundant, will clear soon. were meant for pickling.
+            'corp': os.path.join('thinking', 'braincorp'),
+            'tfidf': os.path.join('thinking', 'braintfidf'),
+            'lsi': os.path.join('thinking', 'brainlsi')
+        }
+
         self.key_list = key_list
         try:
             self.fname = self.get_hashbrown()
