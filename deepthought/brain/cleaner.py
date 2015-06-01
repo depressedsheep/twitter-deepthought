@@ -31,7 +31,6 @@ class launch(object):
 		self.dirs = {
 		'dump':os.path.join('thinking/braindump', self.key),
 		}
-		self.f_text = open(self.dirs['dump'], 'w')
 		self.t_stop = ['rt', '#','http', '@']		
 		queue.put(True)
 	def load(self):
@@ -51,6 +50,7 @@ class launch(object):
 		logging.info("Downloaded " + self.key)
 
 	def sweep(self):
+		self.f_text = open(self.dirs['dump'], 'w')
 		logging.info("Attempting to clean " + self.key)
 		for tweet in self.f:
 			tweet = json.loads(tweet)
