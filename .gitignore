@@ -1,8 +1,7 @@
-config.py
 .idea*
-25-03-2015_17.json.gz
-config.pyc
 logs*
 *.json
-*.pyc
+*.csv
+*/*.pyc
+config.py
 [LOG]

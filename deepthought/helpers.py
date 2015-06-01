@@ -1,10 +1,12 @@
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
+from boto.exception import BotoClientError, BotoServerError
 from config import boto_access, boto_secret
 import logging
 import zipfile
 import bz2
 import os
+import shutil
 
 module_logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ class S3Bucket(object):
     bucket = None
 
     def __init__(self, bucket_name='twitter-deepthought'):
-        # Intialize logger
+        # Initialize logger
         self.logger = logging.getLogger(__name__)
 
         # Authenticate with Amazon S3
@@ -91,7 +93,7 @@ class S3Bucket(object):
         # Try to upload the file
         try:
             k.set_contents_from_filename(file_path)
-        except:
+        except (BotoClientError, BotoServerError):
             raise
 
     @staticmethod
@@ -106,73 +108,79 @@ class S3Bucket(object):
         return key.name
 
 
-def unpack(file_path):
+def upload_dir(dir):
     """
-    Unzip and decompress a dir and its files
-    :param file_path: Path to the zipped dir
+    Given a dir, compress all its files and then upload and delete it
+    :param dir: The name of dir to process
     """
-    module_logger.info("Unpacking " + file_path)
-    # Load the zip file
-    ziph = zipfile.ZipFile(file_path, "r")
+    module_logger.debug("Processing dir '" + dir + "'")
 
-    # Extract all files in the Zipfile
-    ziph.extractall()
+    bucket = S3Bucket()
 
-    # Close the zipfile handle
-    ziph.close()
-
-    # Delete the zip file
-    os.remove(file_path)
-
-    # Get dir where unzipped files are stored
-    dir = os.path.splitext(file_path)[0]
-
+    # Loop through each file in the directory
     for root, dirs, files in os.walk(dir):
         for name in files:
             # Get the file path of current file
             file_path = os.path.join(root, name)
 
-            # Open the original file and the compressed file
-            original_f = open(os.path.splitext(file_path)[0], 'wb')
-            compressed_f = bz2.BZ2File(file_path, 'rb')
+            # Compress the file
+            compress_file(file_path)
+            file_path = dir + "/" + name + ".bz2"
 
-            # Read the compressed file chunk by chunk (chunk size of 1MB)
-            # and write the uncompressed contents into a new file
-            for data in iter(lambda: compressed_f.read(1024 * 1024), b''):
-                original_f.write(data)
+            # Upload the file
+            try:
+                bucket.upload(file_path)
+            except (BotoServerError, BotoClientError):
+                module_logger.error("Upload of " + file_path + " failed!")
 
-            # Close both files
-            original_f.close()
-            compressed_f.close()
-
-            # Remove the old, compressed file
+            # Remove the old, uncompressed file
             os.remove(file_path)
 
+    # Delete the directory after upload, to save space
+    shutil.rmtree(dir)
 
-def upload_dir(dir_path, key=None):
+
+def compress_file(file_path):
     """
-    Given a dir, add its files to a Zipfile and upload the Zipfile
-    :param dir_path: The path of the dir to be uploaded
-    :param key: The key to be used when uploading the dir
+    Given a file, compress it using bz2
+    :param file_path: File to be compressed
     """
-    # File path of zipped dir
-    file_path = dir_path + '.zip'
-    # Set key to be same as file path is none is set
-    if key is None:
-        key = file_path
-    # Zip the dir
-    zip_f = zipfile.ZipFile(file_path, 'w')
-    for root, dirs, files in os.walk(dir_path):
-        for f in files:
-            zip_f.write(os.path.join(root, f))
-    zip_f.close()
-    # Try to upload the zipped dir
-    bucket = S3Bucket()
-    try:
-        bucket.upload(file_path, key)
-    except:
-        module_logger.error("Upload of " + file_path + " failed!")
-    # Delete file after upload
+    logging.debug("Compressing '" + file_path + "'")
+
+    # Open the original file and the compressed file
+    original_f = open(file_path)
+    compressed_f = bz2.BZ2File(file_path + '.bz2', 'w')
+
+    # Read the original file chunk by chunk, due to memory limitations
+    for chunk in read_file_in_chunks(original_f):
+        compressed_f.write(chunk)
+
+    # Close both files
+    original_f.close()
+    compressed_f.close()
+
+
+def decompress_file(file_path):
+    """
+    Given a bz2 compressed file, decompress it
+    :param file_path: Bz2 file to be decompressed
+    """
+    logging.debug("Compressing '" + file_path + "'")
+
+    # Open the original file and the compressed file
+    original_f = open(os.path.splitext(file_path)[0], 'wb')
+    compressed_f = bz2.BZ2File(file_path, 'rb')
+
+    # Read the compressed file chunk by chunk (chunk size of 1MB)
+    # and write the uncompressed contents into a new file
+    for data in iter(lambda: compressed_f.read(1024 * 1024), b''):
+        original_f.write(data)
+
+    # Close both files
+    original_f.close()
+    compressed_f.close()
+
+    # Remove the old, compressed file
     os.remove(file_path)
 
 
