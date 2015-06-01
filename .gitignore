@@ -3,6 +3,5 @@ logs*
 *.json
 *.csv
 */*.pyc
-!config.pyc
 config.py
 [LOG]
