@@ -27,11 +27,12 @@ def main():
     t_list.sort(key=lambda x: gen_dto(x))
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')    
 
-    d = deepthought(t_list)
-    d.start()
-    d.create_dict()
-    d.create_corpus()
-    d.create_tfidf()
+    d = deepthought()
+    d.jumpstart('test')
+    #d.start()
+    #d.create_dict()
+    #d.create_corpus()
+    #d.create_tfidf()
 
 def gen_date(parameters):
     """ Parameters is a dictionary with the below tuples, printing the possible filenames for the hours in the time range.
@@ -76,18 +77,41 @@ class deepthought(object):
             'tfidf': os.path.join('thinking', 'braintfidf'),
             'lsi': os.path.join('thinking', 'brainlsi')
         }
+    def jumpstart(self, dir, fformat = 'raw'):
+        """ Assumes you've already downloaded and extracted the files you want into a directory. 
+        Also assumes various file formats: .json, .csv.
+        I have no idea what these files are like tbh.
+        :param
+            dir: relative path of dir you want to use. 
+            ctrl: Whether it is user controlled. If it is, it'll not try to download the file from S3"""
+
+        logging.info("Current working directory: " + os.path.abspath(os.curdir))
+
+        queue = multiprocessing.Queue()
+        jobs = []
+        for filename in os.listdir(dir):
+            if os.path.isdir(filename):
+                continue
+            f = open(os.path.join(dir,filename), 'rb')
+            ctrl = True
+            p = multiprocessing.Process(target=self.fetch, args=(os.path.join(dir,filename), queue, fformat, ctrl))
+            jobs.append(p)
+            p.start()
+            queue.get()
+            p.join()
+
+    def start(self, key_list):
+        self.key_list = key_list
         try:
             self.fname = self.get_hashbrown()
         except pickle.PickleError:
             logging.info("Hashbrown does not exist yet.")
 
-
-    def start(self, key_list):
-        self.key_list = key_list
         logging.info("Requesting " + str(self.key_list))
         logging.info("Current working directory: " + os.path.abspath(os.curdir))
         """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
         logging.info("Download started.")
+
         queue = multiprocessing.Queue()
         jobs = []
         for key in self.key_list:
@@ -95,13 +119,14 @@ class deepthought(object):
             jobs.append(p)
             p.start()
             queue.get()
-            p.join()
+            p.join()   
 
-    def fetch(self, key, queue):
-        self.ensure_dir(self.dirs['load'])
-        p = brain.cleaner.launch(key, queue)
-        p.load()
-        # p.sweep()
+    def fetch(self, key, queue, fformat, ctrl = False,):
+        #self.ensure_dir(self.dirs['load'])
+        p = brain.cleaner.launch(queue)
+        if not ctrl:
+            p.load(key)
+        p.sweep(key, fformat)
 
     def get_hashbrown(self):
         """ Get the generated hash for the selected file list. """
