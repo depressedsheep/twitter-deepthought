@@ -64,10 +64,7 @@ class deepthought(object):
     Primary analysis module, downloading from Amazon S3, applying Natural Language Processing to it.    
     Working directory is moved to root directory out of convenience.
     """
-    def __init__(self, key_list):
-        self.key_list = key_list
-        logging.info("Requesting " + str(self.key_list))
-        logging.info("Current working directory: " + os.path.abspath(os.curdir))
+    def __init__(self):   
         self.t_stop = ['rt', '#', 'http','@']  
         os.chdir("..")
         self.dirs = {
@@ -85,7 +82,10 @@ class deepthought(object):
             logging.info("Hashbrown does not exist yet.")
 
 
-    def start(self):
+    def start(self, key_list):
+        self.key_list = key_list
+        logging.info("Requesting " + str(self.key_list))
+        logging.info("Current working directory: " + os.path.abspath(os.curdir))
         """ Use multiple processes to download each compressed file. Not sure if it's actually faster. """
         logging.info("Download started.")
         queue = multiprocessing.Queue()

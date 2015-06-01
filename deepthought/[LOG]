@@ -1,0 +1,33 @@
+2015-05-30 18:32:43,238 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 18:32:43,238 : INFO : Current working directory: /home/fadedsheep/Documents/2015/python/twitter-deepthought/deepthought
+2015-05-30 18:33:05,522 : INFO : Requesting ['31-03-2015_02', '31-03-2015_03']
+2015-05-30 18:33:05,522 : INFO : Current working directory: /home/fadedsheep/Documents/2015/python/twitter-deepthought/deepthought
+2015-05-30 18:33:05,522 : INFO : Download started.
+2015-05-30 18:33:10,068 : INFO : [31-03-2015_02] Initialising brain.cleaner.launch()...
+2015-05-30 18:33:10,068 : INFO : [31-03-2015_02] This module loads and cleans a compressed file.
+2015-05-30 18:33:10,069 : INFO : File already exists. Skipping.
+2015-05-30 18:33:10,069 : INFO : Downloaded 31-03-2015_02
+2015-05-30 18:33:10,070 : INFO : Attempting to clean 31-03-2015_02
+2015-05-30 18:33:18,022 : INFO : Dump file for cleaned text created at thinking/braindump/31-03-2015_02
+2015-05-30 18:33:21,838 : INFO : [31-03-2015_03] Initialising brain.cleaner.launch()...
+2015-05-30 18:33:21,838 : INFO : [31-03-2015_03] This module loads and cleans a compressed file.
+2015-05-30 18:33:21,839 : INFO : File already exists. Skipping.
+2015-05-30 18:33:21,839 : INFO : Downloaded 31-03-2015_03
+2015-05-30 18:33:21,839 : INFO : Attempting to clean 31-03-2015_03
+2015-05-30 18:33:28,720 : INFO : Dump file for cleaned text created at thinking/braindump/31-03-2015_03
+2015-05-30 18:33:28,724 : INFO : Initialising dictionary creation, brain.dicter.librarian()...
+2015-05-30 18:33:28,725 : INFO : Assuming file has been cleaned for stopwords.
+2015-05-30 18:33:28,725 : INFO : Hashbrown already exists.
+2015-05-30 18:33:28,726 : INFO : Hashbrown done.
+2015-05-30 18:33:28,726 : INFO : adding document #0 to Dictionary(0 unique tokens: [])
+2015-05-30 18:33:29,114 : INFO : adding document #10000 to Dictionary(16562 unique tokens: [u'1890', u'petra,', u'fuckheads', u'shouted,', u'(photos)']...)
+2015-05-30 18:33:29,424 : INFO : adding document #20000 to Dictionary(26587 unique tokens: [u'petra,', u'504-906-9388', u'woods', u'hanging', u'internet...']...)
+2015-05-30 18:33:29,730 : INFO : adding document #30000 to Dictionary(35027 unique tokens: [u'petra,', u'lying!!!!!!', u'504-906-9388', u'woods', u'spiders']...)
+2015-05-30 18:33:30,038 : INFO : adding document #40000 to Dictionary(42794 unique tokens: [u'petra,', u'lying!!!!!!', u'1,803', u'504-906-9388', u'imagery']...)
+2015-05-30 18:33:30,354 : INFO : adding document #50000 to Dictionary(50513 unique tokens: [u'petra,', u'lying!!!!!!', u'1,803', u'504-906-9388', u'imagery']...)
+2015-05-30 18:33:30,656 : INFO : adding document #60000 to Dictionary(57087 unique tokens: [u'petra,', u'lying!!!!!!', u'sambung', u'1,803', u'504-906-9388']...)
+2015-05-30 18:33:30,960 : INFO : adding document #70000 to Dictionary(63636 unique tokens: [u'petra,', u'chameleone', u'lying!!!!!!', u'+24gb', u'sambung']...)
+2015-05-30 18:33:31,268 : INFO : adding document #80000 to Dictionary(70216 unique tokens: [u'petra,', u'chameleone', u'lying!!!!!!', u'+24gb', u'sambung']...)
+2015-05-30 18:33:31,585 : INFO : adding document #90000 to Dictionary(76487 unique tokens: [u'fiber.', u'petra,', u'chameleone', u'lying!!!!!!', u'+24gb']...)
+2015-05-30 18:33:31,664 : INFO : built Dictionary(77962 unique tokens: [u'fiber.', u'petra,', u'text/wa', u'chameleone', u'lying!!!!!!']...) from 92616 documents (total 537889 corpus positions)
+2015-05-30 18:33:32,014 : INFO : Dict file created at thinking/braindict/7880146e-e066-4a97-987b-2bfb461f0d08
