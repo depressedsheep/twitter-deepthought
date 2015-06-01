@@ -81,7 +81,7 @@ class deepthought(object):
         }
         try:
             self.fname = self.get_hashbrown()
-        except:
+        except pickle.PickleError:
             logging.info("Hashbrown does not exist yet.")
 
     def start(self):
@@ -104,7 +104,11 @@ class deepthought(object):
 
     def get_hashbrown(self):
         """ Get the generated hash for the selected file list. """
-        f = pickle.load(open(os.path.join('thinking', 'hashbrowns'), 'rb'))
+        try:
+            f = pickle.load(open(os.path.join('thinking', 'hashbrowns'), 'rb'))
+        except pickle.PickleError:
+            raise
+
         return f['-'.join(self.key_list)]
 
     def create_dict(self):

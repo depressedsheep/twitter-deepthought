@@ -14,17 +14,17 @@ def main():
     init_logging()
 
     # Create a shared queue of files to be analysed
-    q = Queue.Queue()
+    file_queue = Queue.Queue()
 
     # Run crawler
     c = deepthought.crawler.Crawler()
-    ct = threading.Thread(target=c.start, args=(q,))
+    ct = threading.Thread(target=c.start, args=(file_queue,))
     ct.start()
     ct.name = "Crawler thread"
 
     # Run spike detector
     s = deepthought.spike.SpikeDetector()
-    st = threading.Thread(target=s.start, args=(q,))
+    st = threading.Thread(target=s.start, args=(file_queue,))
     st.start()
     st.name = "Spike detector thread"
 

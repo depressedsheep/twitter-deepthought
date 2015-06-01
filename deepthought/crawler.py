@@ -6,10 +6,10 @@ import twitter
 import bz2
 import threading
 import logging
-import pprint
+import csv
 import socket
 import shutil
-import sys
+import collections
 import helpers
 import config
 
@@ -34,11 +34,11 @@ class Crawler(object):
         start_time          Time when the crawler started
         stream              The Twitter stream where the crawler will get the tweets from
         dir                 The current directory where the crawler is writing to
-        tweets_file         The current file where tweets are being stored
-        tps_file            The current file where Tweets Per Second are being recorded
-        queue               The shared queue with the Spike thread for analysing files
+        file_queue          The shared queue with the Spike thread for analysing files
         socket              The UDP socket used to send the current crawler status
         status              The current status of the crawler
+        files               A dict of files to be used in the crawler
+        logger              Logger used for logging
     """
 
     total_tweets = 0
@@ -48,9 +48,11 @@ class Crawler(object):
     dir = ""
     tweets_file = None
     tps_file = None
-    queue = None
+    file_queue = None
     socket = None
     status = {}
+    files = {}
+    logger = None
 
     def __init__(self):
         """ Initializes class attributes
@@ -67,32 +69,23 @@ class Crawler(object):
         # Initializes the directory the crawler is going to write to
         self.init_dir()
 
-        # Initializes the UDP socket
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            logging.debug("Socket created")
-        except socket.error, msg:
-            logging.error("Failed to create socket. Message: " + msg[1])
-            raise
+    def __del__(self):
+        """ Do cleanup work
+        """
+        self.logger.warn('Crawling stopped/interrupted')
+        self.socket.close()
+        self.tweets_file.close()
+        self.tps_file.close()
 
-        # Bind socket to host and port
-        try:
-            self.socket.bind((config.udp_host, config.udp_port))
-        except socket.error, msg:
-            logging.error("Bind failed. Message: " + msg[1])
-            raise
-        logging.debug("Socket bind completed.")
-
-
-    def start(self, queue):
+    def start(self, file_queue):
         """
         Main function to start the collection of tweets
-        :param queue: Shared queue between Crawler thread and Spike thread of files to be analysed
+        :param file_queue: Shared queue between Crawler thread and Spike thread of files to be analysed
         """
         self.logger.info("Started crawling")
 
         # Initialize shared queue
-        self.queue = queue
+        self.file_queue = file_queue
 
         # Mark start time
         self.start_time = datetime.datetime.now()
@@ -101,7 +94,9 @@ class Crawler(object):
         self.update_status()
 
         # Start status UDP server
-        self.send_status()
+        udp_t = threading.Thread(target=self.send_status)
+        udp_t.start()
+        udp_t.name = "UDP Server Thread"
 
         # Iterate tweets
         try:
@@ -111,25 +106,20 @@ class Crawler(object):
                 self.tps += 1
 
                 # Write tweet to file
-                timestamp = str(time.time())
-                self.tweets_file.write('"' + timestamp + '":' + json.dumps(tweet) + ',')
+                timestamp = time.time()
+                self.files["tweets"].writerow({
+                    'timestamp': timestamp,
+                    'tweet': json.dumps(tweet)
+                })
 
-                # If the current directory name is outdated
+                # Check if it's time to change dir
                 if self.dir != time.strftime('%d-%m-%Y_%H'):
                     self.change_dir()
-        except:
-            self.logger.error("Tweet stream stopped unexpectedly")
-
-    def __del__(self):
-        """ Do cleanup work
-        """
-        self.logger.warn('Crawling stopped/interrupted')
-        self.socket.close()
-        self.tweets_file.close()
-        self.tps_file.close()
+        except StopIteration:
+            self.logger.error("Twitter stream stopped unexpectedly")
 
     def update_status(self):
-        """ Log the current status of the crawler and sends status to frontend
+        """ Update the crawler's status and calculate the tps
         """
         if threading is None:
             return
@@ -146,110 +136,74 @@ class Crawler(object):
             'duration': int(elapsed_time.total_seconds()),
             'total_tweets': self.total_tweets,
             'tps': self.tps,
-            'dir': self.dir,
-            'tweets_file_size': os.path.getsize(self.tweets_file.name),
+            'dir': self.dir
         }
 
         # Update tps file
         timestamp = str(time.time())
-        self.tps_file.write("\"" + timestamp + "\":" + str(self.tps) + ',')
+        self.files["tps"].writerow({
+            'timestamp': timestamp,
+            'tps': self.tps
+        })
 
         # Reset counter for tweets per second
         self.tps = 0
 
     def send_status(self):
+        """
+        Reply any queries for the status of the crawler
+        """
+        # Initializes the UDP socket
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.logger.debug("Socket created")
+        except socket.error, msg:
+            self.logger.error("Failed to create socket. Message: " + msg[1])
+            raise
+
+        # Bind socket to host and port
+        try:
+            self.socket.bind((config.udp_host, config.udp_port))
+        except socket.error, msg:
+            self.logger.error("Bind failed. Message: " + msg[1])
+            raise
+        self.logger.debug("Socket bind completed.")
+
         while True:
             addr = self.socket.recvfrom(1024)[1]
             reply = json.dumps(self.status)
             self.socket.sendto(reply, addr)
 
     def change_dir(self):
-        """ Change the dir the crawler is writing to
-            and starts processing previous hour's dir
+        """ Change the dir the crawler is writing to and starts processing previous hour's dir
         """
-        if self.dir != time.strftime('%d-%m-%Y_%H'):
-            self.logger.info("Changing dir from " + self.dir + " to " + time.strftime('%d-%m-%Y_%H'))
+        self.logger.info("Changing dir from '" + self.dir + "' to '" + time.strftime('%d-%m-%Y_%H') + "'")
 
-            # Close the old files to allow processing
-            self.tweets_file.close()
-            self.tps_file.close()
+        # Close the old files
+        self.tweets_file.close()
+        self.tps_file.close()
 
-            # Make a callback function to add the uploaded dir to the shared Queue
-            callback = lambda f: self.queue.put(f)
+        # Add the file path of the old dir to the queue for analysing
+        self.file_queue.put(self.dir)
 
-            # Starts the upload and processing
-            t = threading.Thread(target=self.process_dir, args=(self.dir, callback))
-            t.start()
-            t.name = "Crawler upload thread"
-
-            # Change dir
-            self.init_dir()
+        # Init new dir
+        self.init_dir()
 
     def init_dir(self):
         """ Initializes the directory the crawler is going to write to
         """
-        self.logger.debug("Initializing dir")
         self.dir = time.strftime('%d-%m-%Y_%H')
+        self.logger.debug("Initializing dir '" + self.dir + "'")
+
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
-        self.tweets_file = open(self.dir + '/tweets.json', 'ab', 0)
-        self.tps_file = open(self.dir + '/tps.json', 'ab', 0)
+        file_handle = open(os.path.join(self.dir, "tweets.csv"), 'wb', 0)
+        writer = csv.DictWriter(file_handle, fieldnames=['timestamp', 'tweet'])
+        writer.writeheader()
+        self.files["tweets"] = writer
 
-    @staticmethod
-    def process_dir(dir, callback=None):
-        """
-        Given a dir, compress and process all its files,
-        and then upload and delete it
-        :param dir: The name of dir to process
-        :param callback: Optional callback function
-        """
-        module_logger.info("Processing dir " + dir)
-        # Loop through each file in the directory
-        for root, dirs, files in os.walk(dir):
-            for name in files:
-                # Get the file path of current file
-                file_path = os.path.join(root, name)
-
-                # Open the original file and the compressed file
-                original_f = open(file_path)
-                compressed_f = bz2.BZ2File(file_path + '.bz2', 'w')
-
-                # If the current file is a JSON file, we have to format it
-                # First, we prepend a '{'
-                if ".json" in name:
-                    compressed_f.write("{")
-
-                # Read the original file chunk by chunk, due to memory limitations
-                # Chunk size is set to 1MB
-                chunk_size = 1024 * 1024
-                for chunk in helpers.read_file_in_chunks(original_f, chunk_size):
-                    # If this is a JSON file and the current chunk is the last chunk in the file,
-                    # we remove the trailing comma from the original file
-                    # We can tell if this is the last chunk as the chunk size will be smaller than what we asked for
-                    if ".json" in name and sys.getsizeof(chunk) < chunk_size:
-                        compressed_f.write(chunk[:-1])
-                    else:
-                        compressed_f.write(chunk)
-
-                # Lastly, we prepend a '}'
-                if ".json" in name:
-                    compressed_f.write("}")
-
-                # Close both files
-                original_f.close()
-                compressed_f.close()
-
-                # Remove the old, uncompressed file
-                os.remove(file_path)
-
-        # Upload the directory
-        key_name = dir + '.zip'
-        helpers.upload_dir(dir, key_name)
-
-        # Delete the directory after upload, to save space
-        shutil.rmtree(dir)
-
-        # If callback is set and is indeed a function, call it with param of the key used
-        if callback is not None and callable(callback):
-            callback(key_name)
+        file_handle = open(os.path.join(self.dir, "tps.csv"), 'wb', 0)
+        writer = csv.DictWriter(file_handle, fieldnames=['timestamp', 'tps'])
+        writer.writeheader()
+        self.files["tps"] = writer
