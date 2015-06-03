@@ -25,14 +25,15 @@ def main():
         '31-03-2015_03'
     ]
     t_list.sort(key=lambda x: gen_dto(x))
-    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')    
+    logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')
 
     d = deepthought()
     d.jumpstart('test')
-    #d.start()
+    # d.start()
     #d.create_dict()
     #d.create_corpus()
     #d.create_tfidf()
+
 
 def gen_date(parameters):
     """ Parameters is a dictionary with the below tuples, printing the possible filenames for the hours in the time range.
@@ -41,13 +42,17 @@ def gen_date(parameters):
         'days': (12, 19)
         'years': (2015, 2015)
         'hours': (15,19) """
-    a = datetime.datetime(parameters['years'][0], parameters['months'][0], parameters['days'][0],parameters['hours'][0])
-    b = datetime.datetime(parameters['years'][1], parameters['months'][1], parameters['days'][1],parameters['hours'][1])
+    a = datetime.datetime(parameters['years'][0], parameters['months'][0], parameters['days'][0],
+                          parameters['hours'][0])
+    b = datetime.datetime(parameters['years'][1], parameters['months'][1], parameters['days'][1],
+                          parameters['hours'][1])
     c = b - a
     no_h = divmod(c.days * 86400 + c.seconds, 3600)[0]
     date_list = [b - datetime.timedelta(hours=x) for x in xrange(0, no_h)]
-    date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y=x.strftime('%Y'), m=x.strftime('%m'), d=x.strftime('%d'),h=x.strftime('%H')), date_list)
+    date_list = map(lambda x: '{y}-{m}-{d}_{h}'.format(y=x.strftime('%Y'), m=x.strftime('%m'), d=x.strftime('%d'),
+                                                       h=x.strftime('%H')), date_list)
     return date_list
+
 
 def gen_dto(date):
     # e.g. '31-03-2015_02'
@@ -60,16 +65,18 @@ def gen_dto(date):
     t = datetime.datetime(d[0], d[1], d[2], d[3])
     return t
 
+
 class deepthought(object):
     """
     Primary analysis module, downloading from Amazon S3, applying Natural Language Processing to it.    
     Working directory is moved to root directory out of convenience.
     """
-    def __init__(self):   
-        self.t_stop = ['rt', '#', 'http','@']  
+
+    def __init__(self):
+        self.t_stop = ['rt', '#', 'http', '@']
         os.chdir("..")
-        
-    def jumpstart(self, dir, fformat = 'raw'):
+
+    def jumpstart(self, dir, fformat='raw'):
         """ Assumes you've already downloaded and extracted the files you want into a directory. 
         Also assumes various file formats: .json, .csv.
         I have no idea what these files are like tbh.
@@ -79,20 +86,20 @@ class deepthought(object):
 
         logging.info("Current working directory: " + os.path.abspath(os.curdir))
         self.dirs = {
-        'load': os.path.join(dir, 'thinking'),
-        'dump': os.path.join(dir,'thinking','braindump'),
-        'corp':os.path.join(dir,'thinking','braincorp'),
-        'dict':os.path.join(dir,'thinking','braindict'),
-        'lsi':os.path.join(dir,'thinking','brainlsi')
+            'load': os.path.join(dir, 'thinking'),
+            'dump': os.path.join(dir, 'thinking', 'braindump'),
+            'corp': os.path.join(dir, 'thinking', 'braincorp'),
+            'dict': os.path.join(dir, 'thinking', 'braindict'),
+            'lsi': os.path.join(dir, 'thinking', 'brainlsi')
         }
         queue = multiprocessing.Queue()
         jobs = []
         for filename in os.listdir(dir):
             if os.path.isdir(filename):
                 continue
-            f = open(os.path.join(dir,filename), 'rb')
+            f = open(os.path.join(dir, filename), 'rb')
             ctrl = True
-            p = multiprocessing.Process(target=self.fetch, args=(os.path.join(dir,filename), queue, fformat, ctrl))
+            p = multiprocessing.Process(target=self.fetch, args=(os.path.join(dir, filename), queue, fformat, ctrl))
             jobs.append(p)
             p.start()
             queue.get()
@@ -127,10 +134,10 @@ class deepthought(object):
             jobs.append(p)
             p.start()
             queue.get()
-            p.join()   
+            p.join()
 
-    def fetch(self, key, queue, fformat, ctrl = False,):
-        #self.ensure_dir(self.dirs['load'])
+    def fetch(self, key, queue, fformat, ctrl=False, ):
+        # self.ensure_dir(self.dirs['load'])
         p = brain.cleaner.launch(queue)
         if not ctrl:
             p.load(key)
@@ -176,7 +183,8 @@ class deepthought(object):
         self.corpus = corpora.MmCorpus(self.f_corp)
         # print self.corpus
 
-        self.tfidf = models.TfidfModel(corpus=self.corpus, dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.fname))))
+        self.tfidf = models.TfidfModel(corpus=self.corpus,
+                                       dictionary=pickle.load(open(os.path.join(self.dirs['dict'], self.fname))))
         self.corpus_tfidf = self.tfidf[self.corpus]
         self.tfidf.save(os.path.join(self.dirs['tfidf'], self.fname + '.tfidf_model'))
 
@@ -190,7 +198,7 @@ class deepthought(object):
         # Currently not very sure, but I'm guessing you'd add an option into the vector generator function to use the 'master' dict, and then add into the LSA structure
         #
         self.ensure_dir(self.dirs['lsi'])
-        if os.path.exists(os.path.join(self.dirs['lsi'],self.fname + '.lsi')):
+        if os.path.exists(os.path.join(self.dirs['lsi'], self.fname + '.lsi')):
             if force == True:
                 logging.info("Forced to create LSI/LSA model again.")
                 self.lsi_creator()

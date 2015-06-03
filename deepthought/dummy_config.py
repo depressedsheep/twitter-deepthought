@@ -1,9 +1,15 @@
 # ------- Credentials for Twitter API ------- #
+ck = ""
+cs = ""
+ot = ""
+ots = ""
 
 # ------- Path to folder where logs are stored ------- #
 log_dir = "logs/"
 
 # ------- Credentials for Amazon S3 ------- #
+boto_access = ""
+boto_secret = ""
 
 # ------- Vars used when detecting spikes ------- #
 # Duration used to calculate EMA and growth

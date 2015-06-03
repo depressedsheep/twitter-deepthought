@@ -1,6 +1,6 @@
 import deepthought.config
 import deepthought.crawler
-import deepthought.spike
+import deepthought.analyser
 import deepthought.helpers
 import logging
 import threading
@@ -23,10 +23,9 @@ def main():
     ct.name = "Crawler thread"
 
     # Run spike detector
-    s = deepthought.spike.SpikeDetector()
-    st = threading.Thread(target=s.start, args=(file_queue,))
-    st.start()
-    st.name = "Spike detector thread"
+    a = deepthought.analyser.Analyser()
+    at = threading.Thread(target=a.start, args=(file_queue,))
+    at.start()
 
 
 def init_logging():

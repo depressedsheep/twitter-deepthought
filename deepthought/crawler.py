@@ -38,6 +38,7 @@ class Crawler(object):
         socket              The UDP socket used to send the current crawler status
         status              The current status of the crawler
         files               A dict of files to be used in the crawler
+        writers             A dict of CSV Writers to be used in the crawler
         logger              Logger used for logging
     """
 
@@ -46,12 +47,11 @@ class Crawler(object):
     start_time = datetime.time()
     stream = twitter.TwitterStream()
     dir = ""
-    tweets_file = None
-    tps_file = None
     file_queue = None
     socket = None
     status = {}
     files = {}
+    writers = {}
     logger = None
 
     def __init__(self):
@@ -73,11 +73,13 @@ class Crawler(object):
         """ Do cleanup work
         """
         self.logger.warn('Crawling stopped/interrupted')
+        # Close the files
+        for (file_name, file_handle) in self.files.iteritems():
+            file_handle.close()
         self.socket.close()
-        self.tweets_file.close()
-        self.tps_file.close()
 
-    def start(self, file_queue):
+
+    def start(self, file_queue=None):
         """
         Main function to start the collection of tweets
         :param file_queue: Shared queue between Crawler thread and Spike thread of files to be analysed
@@ -180,11 +182,12 @@ class Crawler(object):
         self.logger.info("Changing dir from '" + self.dir + "' to '" + time.strftime('%d-%m-%Y_%H') + "'")
 
         # Close the old files
-        self.tweets_file.close()
-        self.tps_file.close()
+        for (file_name, file_handle) in self.files.iteritems():
+            file_handle.close()
 
         # Add the file path of the old dir to the queue for analysing
-        self.file_queue.put(self.dir)
+        if self.file_queue is not None:
+            self.file_queue.put(self.dir)
 
         # Init new dir
         self.init_dir()
@@ -198,12 +201,12 @@ class Crawler(object):
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
-        file_handle = open(os.path.join(self.dir, "tweets.csv"), 'wb', 0)
-        writer = csv.DictWriter(file_handle, fieldnames=['timestamp', 'tweet'])
+        self.files["tweets"] = open(os.path.join(self.dir, "tweets.csv"), 'wb', 0)
+        writer = csv.DictWriter(self.files["tweets"], fieldnames=['timestamp', 'tweet'])
         writer.writeheader()
-        self.files["tweets"] = writer
+        self.writers["tweets"] = writer
 
-        file_handle = open(os.path.join(self.dir, "tps.csv"), 'wb', 0)
-        writer = csv.DictWriter(file_handle, fieldnames=['timestamp', 'tps'])
+        self.files["tps"] = open(os.path.join(self.dir, "tps.csv"), 'wb', 0)
+        writer = csv.DictWriter(self.files["tps"], fieldnames=['timestamp', 'tps'])
         writer.writeheader()
-        self.files["tps"] = writer
+        self.writers["tps"] = writer

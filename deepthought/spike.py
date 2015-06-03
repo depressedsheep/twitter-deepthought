@@ -15,26 +15,16 @@ class SpikeDetector(object):
         # Initialize logger
         self.logger = logging.getLogger(__name__)
 
-    def start(self, file_queue):
-        """
-        Main function to start analyses of files collected
-        :param queue: Shared queue between Crawler and Spike threads of files to be analysed
-        """
-        while True:
-            # Wait until a file path is received
-            file_path = file_queue.get(block=True)
-            self.find_spikes(file_path)
-
-    def find_spikes(self, file_path):
+    def find_spikes(self, dir_path):
         """
         Given a file path, attempt to find the spikes (if any) that occurred within that hour by calculating EMA,
         EMA growth and then checking if said growth exceeds the threshold
         :param file_path: Path to the dir where data is stored
         """
-        self.logger.info("Starting spike detection of dir '" + file_path + "'")
+        self.logger.info("Starting spike detection of dir '" + dir_path + "'")
 
         # Load the TPS data from the file into the dict
-        tps_f = open(os.path.join(file_path, "tps.csv"), 'r')
+        tps_f = open(os.path.join(dir_path, "tps.csv"), 'r')
         tps_reader = csv.reader(tps_f)
         tps_dict = dict(filter(None, tps_reader))
 
@@ -108,15 +98,16 @@ class SpikeDetector(object):
             "spikes": collections.OrderedDict(sorted(spikes.items()))
         }
 
+        # Dump the stats to their respective csv files
         for (stat, values) in data:
-            with open(os.path.join(self.fp, stat + ".csv")) as csvfile:
+            with open(os.path.join(dir_path, stat + ".csv")) as csv_file:
                 field_names = ['timestamp', stat]
-                writer = csv.DictWriter(csvfile, fieldnames=field_names)
+                writer = csv.DictWriter(csv_file, fieldnames=field_names)
 
                 writer.writeheader()
                 writer.writerows(values)
 
-        self.logger.info("Spike detection done and recorded for '" + self.fp + "'")
+        self.logger.info("Spike detection done and recorded for '" + dir_path + "'")
 
     @staticmethod
     def find_spike_contents(timestamp, file_path):
@@ -126,17 +117,31 @@ class SpikeDetector(object):
         :param file_path: Path to dir where data is stored
         :return: Returns the top 5 words used in tweets during the spike
         """
+        # Init the CSV reader for the tweets file
         tweets_f = open(os.path.join(file_path, "tweets.csv"))
         tweets_reader = csv.DictReader(tweets_f)
+
+        # Init a empty list to store the tweets' texts
         spike_tweets_text = []
+
+        # Go through each tweet in the file
         for tweet in tweets_reader:
-            # 1433131173
+
+            # Get the timestamp of the tweet
             tweet_timestamp = int(float(tweet['timestamp']))
-            tweet_text = json.loads(tweet['tweet'])['text']
+
+            # Check if the tweet was tweeted during the spike time
+            # spike_contents_sample_size is an arbitrary duration in seconds after the detected spike where
+            # the tweets are relevant to the reason for the spike
             if timestamp <= tweet_timestamp <= timestamp + config.spike_contents_sample_size:
+
+                # Add the tweet text to the list
+                tweet_text = json.loads(tweet['tweet'])['text']
                 spike_tweets_text.append(tweet_text)
-            elif tweet_timestamp > timestamp:
-                print tweet_timestamp, timestamp, "breaking"
+
+            # Exit the for loop if we are done
+            elif tweet_timestamp > timestamp + config.spike_contents_sample_size:
                 break
 
+        # Temporary placeholder
         return "placeholder"
