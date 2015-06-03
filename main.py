@@ -26,6 +26,7 @@ def main():
     a = deepthought.analyser.Analyser()
     at = threading.Thread(target=a.start, args=(file_queue,))
     at.start()
+    at.name = "Analyser thread"
 
 
 def init_logging():
