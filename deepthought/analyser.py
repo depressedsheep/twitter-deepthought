@@ -1,6 +1,8 @@
 import logging
+
 import spike
-import deepthought
+
+# import deepthought
 import helpers
 
 
@@ -8,7 +10,7 @@ class Analyser(object):
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.spike_detector = spike.SpikeDetector()
-        self.deepthought = deepthought.deepthought()
+        # self.deepthought = deepthought.deepthought()
 
     def start(self, file_queue):
         """

@@ -1,12 +1,14 @@
-from boto.s3.connection import S3Connection
-from boto.s3.key import Key
-from boto.exception import BotoClientError, BotoServerError
-from config import boto_access, boto_secret
 import logging
-import zipfile
 import bz2
 import os
 import shutil
+
+from boto.s3.connection import S3Connection
+from boto.s3.key import Key
+from boto.exception import BotoClientError, BotoServerError
+
+from config import boto_access, boto_secret
+
 
 module_logger = logging.getLogger(__name__)
 

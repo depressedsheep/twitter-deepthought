@@ -1,7 +1,8 @@
-from gensim import corpora, models, similarities
 import os
 import cPickle as pickle
 import logging
+
+from gensim import corpora
 
 
 class blobbify(object):
@@ -11,9 +12,9 @@ class blobbify(object):
         self.key = key
 
         self.dirs = {
-        'dict': os.path.join('thinking', 'braindict', self.key),
-        'dump': os.path.join('thinking', 'braindump', self.key),
-        'corp': os.path.join('thinking', 'braincorp', self.key + '.mm')
+            'dict': os.path.join('thinking', 'braindict', self.key),
+            'dump': os.path.join('thinking', 'braindump', self.key),
+            'corp': os.path.join('thinking', 'braincorp', self.key + '.mm')
         }
 
     def gen(self):

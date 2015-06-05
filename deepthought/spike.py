@@ -1,11 +1,11 @@
 from __future__ import division
-import config
 import json
 import collections
-import helpers
 import csv
 import os
 import logging
+
+import config
 
 
 class SpikeDetector(object):
@@ -29,7 +29,8 @@ class SpikeDetector(object):
         tps_dict = dict(filter(None, tps_reader))
 
         # Convert the timestamps from strings to integers
-        tps_dict = {int(float(k)): v for k, v in tps_dict.items()}
+        tps_dict.pop("timestamp", None)
+        tps_dict = {int(float(k)): int(v) for k, v in tps_dict.items()}
 
         # Initialize variables for storing EMA values, growth values, and timestamps of spikes
         ema = []  # List is used for EMA as we want stack-like behaviour
@@ -86,7 +87,7 @@ class SpikeDetector(object):
                     self.logger.info("Spike found at " + str(timestamp))
 
                     # Add timestamp and contents of the spike to the list
-                    spikes[timestamp] = self.find_spike_contents(timestamp, file_path)
+                    spikes[timestamp] = self.find_spike_contents(timestamp, dir_path)
 
         data = {
             # Combine the list of dicts into one big OrderedDict
@@ -94,18 +95,18 @@ class SpikeDetector(object):
 
             # Sort the dict of values and store it in an OrderedDict
             "growth": collections.OrderedDict(sorted(growth.items())),
-            "tps": collections.OrderedDict(sorted(tps_dict.items())),
             "spikes": collections.OrderedDict(sorted(spikes.items()))
         }
 
         # Dump the stats to their respective csv files
-        for (stat, values) in data:
-            with open(os.path.join(dir_path, stat + ".csv")) as csv_file:
+        for (stat, values) in data.iteritems():
+            with open(os.path.join(dir_path, stat + ".csv"), 'w') as csv_file:
                 field_names = ['timestamp', stat]
                 writer = csv.DictWriter(csv_file, fieldnames=field_names)
 
                 writer.writeheader()
-                writer.writerows(values)
+                for timestamp, value in values.iteritems():
+                    writer.writerow({'timestamp': timestamp, stat: value})
 
         self.logger.info("Spike detection done and recorded for '" + dir_path + "'")
 

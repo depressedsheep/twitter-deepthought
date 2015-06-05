@@ -1,20 +1,18 @@
-from gensim import corpora, models, similarities
-import logging
 import os
-from nltk.corpus import stopwords
-import numpy as np
-import json
-import re
 import cPickle as pickle
-import brain.dicter, brain.cleaner, brain.corpus
-import base64
 import logging
 import multiprocessing
 import datetime
+
+from gensim import corpora, models
+from nltk.corpus import stopwords
+from boto.s3.connection import S3Connection
+
+import brain.dicter
+import brain.cleaner
+import brain.corpus
 from brain.config import boto_access, boto_secret
-from boto.s3.connection import Location, S3Connection
-from boto.s3.key import Key
-import zipfile
+
 
 stop = stopwords.words('english')
 
@@ -30,7 +28,7 @@ def main():
     d = deepthought()
     d.jumpstart('test')
     # d.start()
-    #d.create_dict()
+    # d.create_dict()
     #d.create_corpus()
     #d.create_tfidf()
 

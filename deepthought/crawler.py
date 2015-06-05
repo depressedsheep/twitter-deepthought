@@ -2,16 +2,16 @@ import os
 import time
 import datetime
 import json
-import twitter
-import bz2
 import threading
 import logging
 import csv
 import socket
-import shutil
-import collections
-import helpers
+import urllib2
+
+import twitter
+
 import config
+
 
 module_logger = logging.getLogger(__name__)
 
@@ -63,8 +63,12 @@ class Crawler(object):
         # Initializes a Twitter Stream
         twitter_api = init_twitter_api()
         self.logger.debug("Initializing Twitter Stream")
-        self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
-            .statuses.sample(language='en')
+        try:
+            self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
+                .statuses.sample(language='en')
+        except urllib2.URLError:
+            self.logger.error("Unable to initialize Twitter stream, check internet connection")
+            raise
 
         # Initializes the directory the crawler is going to write to
         self.init_dir()
@@ -77,7 +81,6 @@ class Crawler(object):
         for (file_name, file_handle) in self.files.iteritems():
             file_handle.close()
         self.socket.close()
-
 
     def start(self, file_queue=None):
         """
@@ -109,13 +112,13 @@ class Crawler(object):
 
                 # Write tweet to file
                 timestamp = time.time()
-                self.files["tweets"].writerow({
+                self.writers["tweets"].writerow({
                     'timestamp': timestamp,
                     'tweet': json.dumps(tweet)
                 })
 
                 # Check if it's time to change dir
-                if self.dir != time.strftime('%d-%m-%Y_%H'):
+                if self.dir != self.get_curr_hour():
                     self.change_dir()
         except StopIteration:
             self.logger.error("Twitter stream stopped unexpectedly")
@@ -143,7 +146,7 @@ class Crawler(object):
 
         # Update tps file
         timestamp = str(time.time())
-        self.files["tps"].writerow({
+        self.writers["tps"].writerow({
             'timestamp': timestamp,
             'tps': self.tps
         })
@@ -195,7 +198,7 @@ class Crawler(object):
     def init_dir(self):
         """ Initializes the directory the crawler is going to write to
         """
-        self.dir = time.strftime('%d-%m-%Y_%H')
+        self.dir = self.get_curr_hour()
         self.logger.debug("Initializing dir '" + self.dir + "'")
 
         if not os.path.exists(self.dir):
@@ -210,3 +213,7 @@ class Crawler(object):
         writer = csv.DictWriter(self.files["tps"], fieldnames=['timestamp', 'tps'])
         writer.writeheader()
         self.writers["tps"] = writer
+
+    @staticmethod
+    def get_curr_hour():
+        return time.strftime('%d-%m-%Y_%H')

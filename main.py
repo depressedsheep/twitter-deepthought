@@ -1,12 +1,14 @@
-import deepthought.config
-import deepthought.crawler
-import deepthought.analyser
-import deepthought.helpers
 import logging
 import threading
 import os
 import Queue
 from time import strftime
+
+import deepthought.config
+import deepthought.crawler
+import deepthought.analyser
+import deepthought.helpers
+import deepthought.api
 
 
 def main():
@@ -27,6 +29,12 @@ def main():
     at = threading.Thread(target=a.start, args=(file_queue,))
     at.start()
     at.name = "Analyser thread"
+
+    # Run RESTful API web service
+    r = deepthought.api.API()
+    rt = threading.Thread(target=r.run)
+    rt.start()
+    rt.name = "API webservice thread"
 
 
 def init_logging():

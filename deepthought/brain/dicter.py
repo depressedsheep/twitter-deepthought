@@ -1,8 +1,9 @@
-from gensim import corpora, models, similarities
 import os
 import cPickle as pickle
 import uuid
 import logging
+
+from gensim import corpora
 
 
 class librarian(object):
@@ -14,7 +15,7 @@ class librarian(object):
         self.uname = str(uuid.uuid4())
         self.fname = ''
         self.dirs = {  # 'dict':os.path.join(os.path.dirname(__file__) + '/../thinking/braindict',  self.fname),
-                       #'dump':os.path.join(os.path.dirname(__file__) + '/../thinking/braindump', self.fname),
+                       # 'dump':os.path.join(os.path.dirname(__file__) + '/../thinking/braindump', self.fname),
                        'in': os.path.join('thinking', 'braindump'),
                        'flib': os.path.join('thinking', 'hashbrowns')
                        }
@@ -25,7 +26,7 @@ class librarian(object):
 
         # print self.dirs
 
-    #print self.fname
+    # print self.fname
     def merge(self):
         logging.info("Merging Files now.")
         self.update_dir()
