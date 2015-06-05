@@ -26,8 +26,8 @@ def main():
     logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO, filename='[LOG]')
 
     d = deepthought()
-    d.jumpstart('test')
-    # d.start()
+
+    d.start()
     # d.create_dict()
     #d.create_corpus()
     #d.create_tfidf()
@@ -104,6 +104,7 @@ class deepthought(object):
             p.join()
 
     def start(self, key_list):
+        fformat = 'csv'
         self.dirs = {
             'load': 'thinking',
             'dump': os.path.join('thinking', 'braindump'),
@@ -128,7 +129,7 @@ class deepthought(object):
         queue = multiprocessing.Queue()
         jobs = []
         for key in self.key_list:
-            p = multiprocessing.Process(target=self.fetch, args=(key, queue,))
+            p = multiprocessing.Process(target=self.fetch, args=(key, queue,fformat))
             jobs.append(p)
             p.start()
             queue.get()
@@ -137,7 +138,7 @@ class deepthought(object):
     def fetch(self, key, queue, fformat, ctrl=False, ):
         # self.ensure_dir(self.dirs['load'])
         p = brain.cleaner.launch(queue)
-        if not ctrl:
+        if ctrl == False:
             p.load(key)
         p.sweep(key, fformat)
 

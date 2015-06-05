@@ -21,7 +21,8 @@ class launch(object):
         queue.put(True)
         self.f = None
 
-    def load(self):
+    def load(self, fformat):
+        logging.info("Requested format: " + fformat)
         logging.info("[{}] Initialising brain.cleaner.launch()...".format(self.key))
         logging.info("[{}] This module loads and cleans a compressed file.".format(self.key))
         self.conn = S3Connection(boto_access, boto_secret)
@@ -49,33 +50,45 @@ class launch(object):
             logging.info('File already exists. Skipping.')
         if self.z:
             zf = zipfile.ZipFile(os.path.join('thinking', self.key + '.zip'))
-            zf.extractall()
+            zf.extractall()         
+
         else:
             self.f = gzip.open(os.path.join('thinking', self.key), 'rb')
+
+
         logging.info("Downloaded " + self.key)
 
     def sweep(self, key, fformat='json'):
         self.key = key
-        if self.f == None:
-            logging.info("self.f not defined yet, assuming this is coming from jumpstart.")
-        self.f = open(key)
+        if fformat == 'list':
+            logging.info("Assuming this is coming from jumpstart.")
+            logging.info("Also assuming user passes a sentence (string)")
+            return self.clean(key)
+        else:
         # Directory of your file.
-        fp = os.path.dirname(os.path.realpath(key))
-        if not os.path.exists(os.path.join(fp, 'thinking')):
-            os.makedirs(os.path.join(fp, 'thinking'))
-        self.f_text = open(os.path.join(fp, 'thinking', 'cleaned'), 'w')
-        logging.info("Attempting to clean " + self.key)
-        # Assumes normal text with a json every line.
-        for tweet in self.f:
+            
+
+            if not os.path.exists(os.path.join(fp, 'thinking')):
+                os.makedirs(os.path.join(fp, 'thinking'))
+
+            self.f_text = open(os.path.join('thinking', 'braindump', self.key), 'w')
+            logging.info("Attempting to clean " + self.key)
+            # Assumes normal text with a json every line.
             if fformat == 'json':
-                tweet = json.loads(tweet)
-                text = tweet['text']
-            elif fformat == 'raw':
-                text = tweet
-            text = self.clean(text)
+                for tweet in self.f:
+                    tweet = json.loads(tweet)
+                    text = tweet['text']
+                    text = self.clean(text)
+            elif fformat == 'csv':
+                # UNSURE ABOUT FILE STRUCTURE
+                tweets_f = open(os.path.join('thinking', self.key, 'placeholder', 'tweets.csv'))
+                tweet_reader = csv.DictReader(tweets_f)
+                for tweet in tweet_reader:
+                    text = self.clean(json.loads(tweet["tweet"])["text"])
+
             self.f_text.write(' '.join(text).encode('ascii', 'ignore') + '\n')
-        self.f_text.close()
-        logging.info("Dump file for cleaned text created at " + fp)
+            self.f_text.close()
+            logging.info("Dump file for cleaned text created at " + fp)
 
     def clean(self, text):
         tl = unicode(text.lower()).split(' ')
