@@ -5,7 +5,6 @@ import json
 import threading
 import logging
 import csv
-import socket
 import urllib2
 
 import twitter
@@ -35,7 +34,6 @@ class Crawler(object):
         stream              The Twitter stream where the crawler will get the tweets from
         dir                 The current directory where the crawler is writing to
         file_queue          The shared queue with the Spike thread for analysing files
-        socket              The UDP socket used to send the current crawler status
         status              The current status of the crawler
         files               A dict of files to be used in the crawler
         writers             A dict of CSV Writers to be used in the crawler
@@ -48,7 +46,6 @@ class Crawler(object):
     stream = twitter.TwitterStream()
     dir = ""
     file_queue = None
-    socket = None
     status = {}
     files = {}
     writers = {}
@@ -87,7 +84,7 @@ class Crawler(object):
         Main function to start the collection of tweets
         :param file_queue: Shared queue between Crawler thread and Spike thread of files to be analysed
         """
-        self.logger.info("Started crawling")
+        self.logger.warn("Crawler started")
 
         # Initialize shared queue
         self.file_queue = file_queue
@@ -97,11 +94,6 @@ class Crawler(object):
 
         # Initial call to update status
         self.update_status()
-
-        # Start status UDP server
-        udp_t = threading.Thread(target=self.send_status)
-        udp_t.start()
-        udp_t.name = "UDP Server Thread"
 
         # Iterate tweets
         try:
@@ -144,6 +136,10 @@ class Crawler(object):
             'dir': self.dir
         }
 
+        # Dump status to json file
+        status_file = open(os.path.join(config.working_dir, "status.json"), 'wb', 0)
+        json.dump(self.status, status_file)
+
         # Update tps file
         timestamp = str(time.time())
         self.writers["tps"].writerow({
@@ -153,31 +149,6 @@ class Crawler(object):
 
         # Reset counter for tweets per second
         self.tps = 0
-
-    def send_status(self):
-        """
-        Reply any queries for the status of the crawler
-        """
-        # Initializes the UDP socket
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.logger.debug("Socket created")
-        except socket.error, msg:
-            self.logger.error("Failed to create socket. Message: " + msg[1])
-            raise
-
-        # Bind socket to host and port
-        try:
-            self.socket.bind((config.udp_host, config.udp_port))
-        except socket.error, msg:
-            self.logger.error("Bind failed. Message: " + msg[1])
-            raise
-        self.logger.debug("Socket bind completed.")
-
-        while True:
-            addr = self.socket.recvfrom(1024)[1]
-            reply = json.dumps(self.status)
-            self.socket.sendto(reply, addr)
 
     def change_dir(self):
         """ Change the dir the crawler is writing to and starts processing previous hour's dir
@@ -216,4 +187,4 @@ class Crawler(object):
 
     @staticmethod
     def get_curr_hour():
-        return time.strftime('%d-%m-%Y_%H')
+        return os.path.join(config.working_dir, time.strftime('%d-%m-%Y_%H'))

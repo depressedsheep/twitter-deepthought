@@ -17,7 +17,8 @@ class Analyser(object):
         Main function to start analyses of files collected
         :param file_queue: Shared queue between Crawler and Spike threads of files to be analysed
         """
-
+        self.logger.warn("Analyser started")
+        
         while True:
             # Wait until a file path is received
             file_path = file_queue.get(block=True)
