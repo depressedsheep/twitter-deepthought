@@ -36,8 +36,10 @@ def gen_date(parameters):
 
 def main():
     a = deepthought()
+    #a.nlpstuff()
     keylist = gen_date({'months':(4,5), 'days':(1,20), 'years':(2015,2015),'hours':(0,23)})
-    a.download(keylist,'.gz')
+    #a.download(keylist,'.gz')
+    a.nlpstuff(load = True)
 
 class deepthought():
     def __init__(self,**kwargs):
@@ -100,20 +102,51 @@ class deepthought():
                 pass
         pickle.dump(pk,open('.presentkeys','w'))
         if filetype == '.gz':
+            g = open(os.path.join(self.dirs['dict'],'merged'),'w')
             for key in key_list:
                 if not (key+filetype) in pk:
                     continue
-                f = gzip.open(os.path.join(self.dirs['downloads'],key+filetype),'rb')
-                g = open(os.path.join(self.dirs['dict'],'merged'),'w')
-                for line in f:
-                    tweet = json.loads(line)
-                    text = tweet['text']
-                    text = cleaner(text)
-                    g.write(' '.join(text) + '\n')
-            os.remove(os.path.join(self.dirs['downloads'], key+filetype))
+                print os.path.join(self.dirs['downloads'],key+filetype)
+                print os.path.exists(os.path.join(self.dirs['downloads'],key+filetype))
+
+                try:
+                    f = gzip.open(os.path.join(self.dirs['downloads'],key+filetype),'rb')
+
+                    for line in f:
+                        tweet = json.loads(line)
+                        text = tweet['text']
+                        text = cleaner(text)
+                        g.write(' '.join(text).encode('ascii','ignore') + '\n')
+                except IOError:
+                    print "ioerror"
+
+            #os.remove(os.path.join(self.dirs['downloads'], key+filetype))
             g.close()
-    def nlpstuff(self):
+    def nlpstuff(self, load = False):
         self.check_dirs()
+
+        if load:
+            dict = pickle.load(open(os.path.join(self.dirs['dict'],'dict'),'rb'))
+            corpus = corpora.MmCorpus(os.path.join(self.dirs['corpus'],'corp.mm'))
+            tfidf = models.TfidfModel.load(os.path.join(self.dirs['tfidf'], 'tfidfmodel'))
+        else:
+            f = open(os.path.join(self.dirs['dict'],'merged'),'r')
+            dict = corpora.Dictionary(line[:-1].lower().split() for line in f)
+            once_ids = [tokenid for tokenid, docfreq in dict.iteritems() if docfreq == 1]
+            dict.filter_tokens(once_ids)
+            dict.compactify()
+            pickle.dump(dict, open(os.path.join(self.dirs['dict'],'dict'), 'w'))
+            f.close()
+            f = open(os.path.join(self.dirs['dict'],'merged'),'r')
+            corpus = [dict.doc2bow(line.split(' ')) for line in f]
+            corpora.MmCorpus.serialize(os.path.join(self.dirs['corpus'], 'corp.mm'),corpus)
+            tfidf = models.TfidfModel(corpus = corpus, dictionary=dict)
+            corpus_tfidf = tfidf[corpus]
+            tfidf.save(os.path.join(self.dirs['tfidf'], 'tfidfmodel'))
+
+        #lsi = models.LsiModel(corpus_tfidf, id2word = dict, num_topics=200)
+        #corpus_lsi = lsi[corpus_tfidf]
+        #lsi.print_topics(5)
 
 def cleaner(text):
    	def strip_emojis(tl):
