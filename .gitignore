@@ -1,7 +1,11 @@
 .idea*
 logs*
-*.json
-*.csv
-*/*.pyc
+*json
+*csv
+*pyc
 config.py
 [LOG]
+tmp*
+docs*
+*dump
+thinking*

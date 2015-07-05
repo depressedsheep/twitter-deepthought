@@ -1,10 +1,12 @@
+"""This module collects tweets and saves them for analysis later"""
+
 import os
 import time
 import datetime
 import json
-import threading
 import logging
 import csv
+import threading
 import urllib2
 
 import twitter
@@ -16,7 +18,11 @@ module_logger = logging.getLogger(__name__)
 
 
 def init_twitter_api():
-    """ Initializes a Twitter API object """
+    """ Helper function to connect to the Twitter API
+
+    Returns:
+        twitter_api (twitter.TwitterStream): Twitter API object
+    """
     module_logger.debug("Initializing Twitter API")
     # Authenticate with twitter api
     auth = twitter.oauth.OAuth(config.ot, config.ots, config.ck, config.cs)
@@ -24,38 +30,52 @@ def init_twitter_api():
     return twitter_api
 
 
-class Crawler(object):
-    """ Accepts Twitter tweet stream and save them hourly
+class Crawler(threading.Thread):
+    """ Accepts Twitter stream and saves tweets hourly
 
     Attributes:
-        total_tweets        The total number of tweets the crawler has collected
-        tps                 Tweets Per Second
-        start_time          Time when the crawler started
-        stream              The Twitter stream where the crawler will get the tweets from
-        dir                 The current directory where the crawler is writing to
-        file_queue          The shared queue with the Spike thread for analysing files
-        status              The current status of the crawler
-        files               A dict of files to be used in the crawler
-        writers             A dict of CSV Writers to be used in the crawler
-        logger              Logger used for logging
+        total_tweets (int): The total number of tweets the crawler has collected
+        tps (int): Variable to calculate Tweets Per Second
+        start_time (datetime): Time when the crawler started
+        stream (twitter.TwitterStream): The Twitter stream where the crawler will get the tweets from
+        dir (str): The current directory where the crawler is writing to
+        file_queue (Queue.Queue): The shared queue with the Processor thread to send files for processing
+        status (dict): The current status of the crawler
+        files (dict): A dict of files to be used in the crawler, namely tweets.csv and tps.csv
+        writers (dict): A dict of CSV Writers to be used in the crawler
+        logger (logging.Logger): Logger used for logging
+        stopped (bool): Boolean value indicating if crawler has stopped
     """
 
-    total_tweets = 0
-    tps = 0
-    start_time = datetime.time()
-    stream = twitter.TwitterStream()
-    dir = ""
-    file_queue = None
-    status = {}
-    files = {}
-    writers = {}
-    logger = None
+    def __init__(self, file_queue):
+        """Initializes crawler"""
+        self.total_tweets = 0
+        self.tps = 0
+        self.start_time = None
+        self.stream = None
+        self.dir = ""
+        self.status = {}
+        self.files = {}
+        self.writers = {}
+        self.stopped = False
 
-    def __init__(self):
-        """ Initializes class attributes
-        """
+        # Call thread constructor
+        super(Crawler, self).__init__()
+
         # Initialize logging
         self.logger = logging.getLogger(__name__)
+
+        # Init file queue
+        self.file_queue = file_queue
+
+    def run(self):
+        """Main function for the collection of tweets
+
+        It establishes a connection to the Twitter Stream and iterate over each tweet, appending the timestamp and tweet
+        to the tweet.csv file. It also checks if it is time to change directory.
+        """
+
+        self.logger.warn("Crawler started")
 
         # Initializes a Twitter Stream
         twitter_api = init_twitter_api()
@@ -63,68 +83,79 @@ class Crawler(object):
         try:
             self.stream = twitter.TwitterStream(auth=twitter_api.auth) \
                 .statuses.sample(language='en')
-        except urllib2.URLError:
-            self.logger.error("Unable to initialize Twitter stream, check internet connection")
+        except urllib2.URLError:  # This exception is raised when there is no internet
+            self.logger.error("Unable to initialize Twitter stream, please check your internet connection")
             raise
 
         # Initializes the directory the crawler is going to write to
         self.init_dir()
 
-    def __del__(self):
-        """ Do cleanup work
-        """
-        self.logger.warn('Crawling stopped/interrupted')
-        # Close the files
-        for (file_name, file_handle) in self.files.iteritems():
-            file_handle.close()
-        self.socket.close()
-
-    def start(self, file_queue=None):
-        """
-        Main function to start the collection of tweets
-        :param file_queue: Shared queue between Crawler thread and Spike thread of files to be analysed
-        """
-        self.logger.warn("Crawler started")
-
-        # Initialize shared queue
-        self.file_queue = file_queue
-
         # Mark start time
         self.start_time = datetime.datetime.now()
 
-        # Initial call to update status
+        # Start updating status every second from now
         self.update_status()
 
-        # Iterate tweets
+        # Iterate the tweets in the stream
         try:
             for tweet in self.stream:
+                # If the crawler has been stopped, break out of the loop
+                if self.stopped:
+                    break
+
                 # Update counters
                 self.total_tweets += 1
                 self.tps += 1
 
-                # Write tweet to file
+                # Append tweet to csv file
                 timestamp = time.time()
-                self.writers["tweets"].writerow({
-                    'timestamp': timestamp,
-                    'tweet': json.dumps(tweet)
-                })
+                try:
+                    self.writers["tweets"].writerow({
+                        'timestamp': timestamp,
+                        'tweet': json.dumps(tweet)
+                    })
+                except ValueError:
+                    self.logger.error("Failed to write to tweets.csv")
+                    raise
 
-                # Check if it's time to change dir
+                # Check if it is time to change dir, which happens every hour
                 if self.dir != self.get_curr_hour():
                     self.change_dir()
         except StopIteration:
             self.logger.error("Twitter stream stopped unexpectedly")
 
-    def update_status(self):
-        """ Update the crawler's status and calculate the tps
+    def stop(self):
+        """Stops the crawler
+
+        It ensures that all file I/Os stops and closes the file handlers to prevent corrupted data
         """
-        if threading is None:
+        self.logger.warn('Crawling stopped/interrupted')
+
+        # Set stopped to True
+        self.stopped = True
+
+        # Ensure that no more writing will occur
+        time.sleep(1.5)
+
+        # Close the files
+        for (file_name, file_handle) in self.files.iteritems():
+            file_handle.close()
+
+    def update_status(self):
+        """Update the crawler's status and calculates the TPS
+
+        Note:
+            The tps is calculated using a counter, which is incremented every time a tweet is processed.
+            Every second, the value of the counter is noted and is reset to 0.
+        """
+        # If the crawler has been stopped, break
+        if self.stopped:
             return
 
-        # Update status every second
+        # Call this function again one second from now
         t = threading.Timer(1, self.update_status)
+        t.daemon = True
         t.start()
-        t.name = "Crawler status thread"
 
         # Calculate time elapsed
         elapsed_time = datetime.datetime.now() - self.start_time
@@ -136,38 +167,40 @@ class Crawler(object):
             'dir': self.dir
         }
 
-        # Dump status to json file
-        status_file = open(os.path.join(config.working_dir, "status.json"), 'wb', 0)
-        json.dump(self.status, status_file)
-
-        # Update tps file
+        # Append to the tps file
         timestamp = str(time.time())
-        self.writers["tps"].writerow({
-            'timestamp': timestamp,
-            'tps': self.tps
-        })
+        try:
+            self.writers["tps"].writerow({
+                'timestamp': timestamp,
+                'tps': self.tps
+            })
+        except ValueError:
+            self.logger.error("Failed to write to tps.csv")
+            raise
 
-        # Reset counter for tweets per second
+        # Reset tps counter
         self.tps = 0
 
     def change_dir(self):
-        """ Change the dir the crawler is writing to and starts processing previous hour's dir
-        """
-        self.logger.info("Changing dir from '" + self.dir + "' to '" + time.strftime('%d-%m-%Y_%H') + "'")
+        """Sends the old files to the Processor and initializes a new directory"""
+        self.logger.info("Changing dir from '" + self.dir + "' to '" + self.get_curr_hour()  + "'")
 
         # Close the old files
         for (file_name, file_handle) in self.files.iteritems():
             file_handle.close()
 
-        # Add the file path of the old dir to the queue for analysing
+        # Send the file path of the old dir to processor
         if self.file_queue is not None:
+            self.logger.warn("File '" + self.dir + "' sent by crawler")
             self.file_queue.put(self.dir)
 
         # Init new dir
         self.init_dir()
 
     def init_dir(self):
-        """ Initializes the directory the crawler is going to write to
+        """Initializes a directory for the crawler
+
+        It also opens tweets.csv and tps.csv in the directory for writing
         """
         self.dir = self.get_curr_hour()
         self.logger.debug("Initializing dir '" + self.dir + "'")
@@ -175,6 +208,8 @@ class Crawler(object):
         if not os.path.exists(self.dir):
             os.makedirs(self.dir)
 
+        # Creates and opens tweets.csv and tps.csv for writing
+        # They will be closed when it's time to change dir or if the crawler has been stopped
         self.files["tweets"] = open(os.path.join(self.dir, "tweets.csv"), 'wb', 0)
         writer = csv.DictWriter(self.files["tweets"], fieldnames=['timestamp', 'tweet'])
         writer.writeheader()
@@ -187,4 +222,12 @@ class Crawler(object):
 
     @staticmethod
     def get_curr_hour():
+        """Method that returns the current hour
+
+        Returns:
+            The current hour in the format of '%d-%m-%Y_%H'
+
+        Note:
+            The working dir is prepended
+        """
         return os.path.join(config.working_dir, time.strftime('%d-%m-%Y_%H'))
