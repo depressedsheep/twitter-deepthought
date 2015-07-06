@@ -8,7 +8,7 @@ import os
 import logging
 import sys
 
-import config
+from deepthought import config
 
 
 class Analyser(object):

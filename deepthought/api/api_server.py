@@ -4,18 +4,17 @@ through this RESTful web API
 """
 import logging
 import threading
+import sys
 
 import flask
 import flask_restful
 from flask_restful import Resource
 
-import app
-import search
-import config
+from deepthought import config
+from deepthought.api import search
 
 
-class API(threading.Thread):
-
+class APIServer(threading.Thread):
     """Runs a Flask server to serve the API"""
 
     CrawlerStatus_url = 'crawler/status'
@@ -23,14 +22,19 @@ class API(threading.Thread):
 
     def __init__(self):
         """Initializes the API thread"""
-        super(API, self).__init__()
+        super(APIServer, self).__init__()
         self.logger = logging.getLogger(__name__)
+        self.app = None
 
     def run(self):
         """Setups the API server"""
         # Initializes the server
-        app = flask.Flask(__name__)
-        api = flask_restful.Api(app)
+        self.app = flask.Flask(__name__)
+        api = flask_restful.Api(self.app)
+
+        # Setup server logging such that only errors are displayed
+        log = logging.getLogger('werkzeug')
+        log.setLevel(logging.ERROR)
 
         # Setup the routes for the server
         api_base_url = config.api_base_url
@@ -40,7 +44,7 @@ class API(threading.Thread):
         # Run the Flask server on the specified port
         # The server is not run on the default port to prevent clashes
         self.logger.warn("API webservice started")
-        app.run(debug=False, port=config.api_port)
+        self.app.run(debug=False, port=config.api_port)
 
     def stop(self):
         """Stop the API server"""
@@ -57,6 +61,7 @@ class CrawlerStatus(Resource):
         Returns:
             status (dict): The status of the crawler
         """
+        from deepthought import app
         return app.threads['crawler'].status
 
 

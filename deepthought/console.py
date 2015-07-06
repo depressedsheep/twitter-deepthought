@@ -4,9 +4,9 @@ import cmd
 import time
 import os
 import pprint
-import app
 
-import analyser
+from deepthought.processing import analyser
+from deepthought.api import api_server
 
 
 class Console(cmd.Cmd):
@@ -30,13 +30,15 @@ class Console(cmd.Cmd):
         self.pp = pprint.PrettyPrinter(indent=4)
 
         # Init the list of threads
-        self.threads = app.threads
+        self.threads = {}
 
         self.intro = '\n\ndeepthought console - type ? for help\ntype exit to close program'
         self.prompt = '\ndeepthought > '
 
     def run(self):
         """Starts the threads, and then start the console"""
+        from deepthought import app
+        self.threads = app.threads
         # Wait for threads to start running before starting console
         time.sleep(2)
         self.cmdloop()
@@ -119,3 +121,22 @@ class Console(cmd.Cmd):
     def help_analyse():
         """Help message for EOF command"""
         print "analyse <file_path>\n Analyses provided files"
+
+    def do_api(self, command):
+        if (command == "stop" and "api" not in self.threads.keys()) or \
+                (command == "start" and "api" in self.threads.keys()):
+            self.logger.error("API not running!" if command == "stop" else "API already running!")
+            return
+
+        if command == "stop":
+            self.threads['api'].stop()
+            self.threads.pop('api')
+        elif command == "start":
+            reload(api_server)
+            self.threads['api'] = api_server.APIServer()
+            self.threads['api'].start()
+        elif command == "restart":
+            self.do_api("stop")
+            self.do_api("start")
+        else:
+            self.logger.error("API command not recognized!")

@@ -3,14 +3,14 @@ import calendar
 import os
 import collections
 
-import helpers
+from deepthought import helpers
 
 
 def search(query):
     """Searches a list of files to find the frequency of the keyword in tweets over time.
 
     This is done by first getting the list of files to be searched, with the method :meth:`deepthought.search.get_dates_in_range`.
-    If any of the files are missing, the dates will be ommitted.
+    If any of the files are missing, the dates will be omitted.
 
     Then, the corresponding search.txt files of the dates are downloaded and opened one by one. Due to the large file
     sizes and memory limitations, the search.txt fils are read in chunks of 10MB. The builtin function ``count`` is used

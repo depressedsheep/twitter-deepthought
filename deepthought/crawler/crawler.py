@@ -11,7 +11,7 @@ import urllib2
 
 import twitter
 
-import config
+from deepthought import config
 
 
 module_logger = logging.getLogger(__name__)

@@ -2,8 +2,8 @@
 import logging
 import threading
 
-import analyser
-import helpers
+from deepthought import helpers
+from deepthought.processing import analyser
 
 
 class Processor(threading.Thread):

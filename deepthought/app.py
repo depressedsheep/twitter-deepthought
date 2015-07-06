@@ -9,12 +9,10 @@ from time import strftime
 import os
 import Queue
 
-import config
-import crawler
-import processor
-import helpers
-import api
-import console
+from deepthought import config, helpers, console
+from deepthought.crawler import crawler
+from deepthought.processing import processor
+from deepthought.api import api_server
 
 
 # List of threads
@@ -39,7 +37,7 @@ class App(object):
         global threads
         threads['processor'] = processor.Processor(file_queue)
         threads['crawler'] = crawler.Crawler(file_queue)
-        threads['api'] = api.API()
+        threads['api'] = api_server.APIServer()
         console_thread = console.Console()
 
         # Start the threads

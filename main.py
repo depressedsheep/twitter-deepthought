@@ -18,7 +18,8 @@ if __name__ == '__main__':
             a.start()
         except:
             dump_file_path = time.strftime('%d-%m-%Y_%H_%M') + ".dump"
-            print "-" * 50 + "\n\nFatal error occurred! Dumping stack trace to '" + dump_file_path + "'\n\n" + "-" * 50
+            div = "\n\n" + "-" * 50 + "\n\n"
+            print div + "Fatal error occurred! Dumping stack trace to '" + dump_file_path + "'" + div
             traceback.print_exc(file=open(dump_file_path, 'wb'))
         else:
             break
