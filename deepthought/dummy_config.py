@@ -7,6 +7,7 @@ Attributes:
     ots (str): Access Token Secret for Twitter's API
     boto_access (str): Amazon S3 access key
     boto_secret (str): Amazon S3 secret key
+    bucket_name (str): Name to use for the main bucket when storing files on Amazon S3 Servers
     log_dir (str): Directory where log files are stored
     working_dir (str): Directory where tmp files are stored
     ema_length (int): Length of EMA sample size in seconds
@@ -26,6 +27,7 @@ ots = ""
 # ------- Amazon S3 credentials ------- #
 boto_access = ""
 boto_secret = ""
+bucket_name = "twitter-deepthought"
 
 # ------- Directories  ------- #
 log_dir = "logs/"
