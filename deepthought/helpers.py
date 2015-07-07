@@ -4,6 +4,7 @@ import logging
 import bz2
 import os
 import shutil
+import threading
 
 from boto.s3.connection import S3Connection, Location
 from boto.s3.key import Key
@@ -82,6 +83,15 @@ class S3Bucket(object):
                 return key
         return None
 
+    def find_keys(self, key_name):
+        self.logger.debug("Finding all keys with name of '" + key_name + "'")
+        key_list = list()
+        for key in self.list_keys():
+            if key_name in key.name:
+                key_list.append(key)
+        return key_list
+
+
     def upload(self, file_path, key_name=None):
         """Upload a file to this bucket
 
@@ -117,10 +127,25 @@ class S3Bucket(object):
         """
         module_logger.info("Downloading " + key.name)
         if file_path is None:
-            key.get_contents_to_filename(key.name)
-        else:
-            key.get_contents_to_filename(file_path)
+            file_path = key.name.replace("/", "\\")
+
+        d = os.path.dirname(file_path)
+        if not os.path.exists(d):
+            os.makedirs(d)
+
+        key.get_contents_to_filename(file_path)
         return file_path
+
+    @staticmethod
+    def download_async(key_list, dir_path=""):
+        def download_thread(k):
+            b = S3Bucket()
+            b.download(k, os.path.join(dir_path, k.name.replace("/", "\\")))
+
+        for key in key_list:
+            t = threading.Thread(target=download_thread, args=(key,))
+            t.start()
+            t.join()
 
 
 def upload_dir(dir_path):

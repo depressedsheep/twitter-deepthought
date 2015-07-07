@@ -6,7 +6,8 @@ import collections
 import csv
 import os
 import logging
-import sys
+
+from nltk.corpus import stopwords
 
 from deepthought import config
 
@@ -53,26 +54,35 @@ class Analyser(object):
 
         self.logger.info("Starting analysing of dir '" + self.dir_path + "'")
 
-        # Initializes a 'search' string which contains data optimized for searching later
-        search = ""
-        tweets_reader = csv.DictReader(self.tweets_f)
-
-        # Append each tweet's text to the 'search' string
-        for tweet in tweets_reader:
-            search += json.loads(tweet['tweet'])['text']
-
-        # Write this value to search.txt
-        with open(os.path.join(self.dir_path, "search.txt"), 'w') as f:
-            # Ensure that the string can be written
-            search = search.encode(sys.stdout.encoding, errors='replace')
-            # Escape the string
-            search = repr(search)
-            f.write(search)
+        # Generate dict containing the frequency of words
+        self.gen_freq_dict()
 
         # Run spike detection function
         self.find_spikes()
 
         self.logger.info("Analysing done for '" + dir_path + "'")
+
+    def gen_freq_dict(self):
+        tweets_reader = csv.DictReader(self.tweets_f)
+        tweets = ""
+
+        # Concat each tweets' text
+        for tweet in tweets_reader:
+            tweets += json.loads(tweet['tweet'])['text'] + " "
+
+        # Some processing of the tweets
+        tweets = tweets.encode("utf-8", errors="replace")
+        tweets = tweets.lower()
+        tweets = tweets.split()
+        stop_words = set(stopwords.words("english"))
+        stop_words.update(["rt", "#"])
+        tweets = [word for word in tweets if word not in stop_words]
+
+        freq_dict = collections.Counter(tweets)
+        search_fp = os.path.join(self.dir_path, "search.json")
+        search_file = open(search_fp, "w")
+        json.dump(freq_dict, search_file)
+
 
     def find_spikes(self):
         """Find if any spikes occurred with the given tps file
@@ -162,7 +172,7 @@ class Analyser(object):
                 field_names = ['timestamp', stat]
                 writer = csv.DictWriter(f, fieldnames=field_names)
                 writer.writeheader()
-                for timestamp, value in stat.iteritems():
+                for timestamp, value in values.iteritems():
                     writer.writerow({'timestamp': timestamp, stat: value})
 
     def find_spike_contents(self, timestamp):

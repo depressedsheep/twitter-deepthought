@@ -1,9 +1,12 @@
 """This module provides the search functionality for the API module."""
 import calendar
-import os
 import collections
+import uuid
+import os
+import shutil
+import json
 
-from deepthought import helpers
+from deepthought import config, helpers
 
 
 def search(query):
@@ -35,46 +38,29 @@ def search(query):
         ordered_freq (collections.OrderedDict): An ordered dict of (time, frequency) values
     """
 
-    '''
-        TODO:
-            - fix code to allow simultaneous queries (uniq dl file locs)
-    '''
-
     frequency = {}
-    # List of files to be searched for
-    file_list = get_dates_in_range("06-06-2015_01", "06-06-2015_21")
 
-    bucket = helpers.S3Bucket()
-    for file in file_list:
-        # key_name = file + "/search.csv.bz2"
-        # key = bucket.find_key(key_name)
-        # file_path = os.path.join(config.working_dir, "TMP_search.txt.bz2")
-        # if os.path.isfile(file_path):
-        # os.remove(file_path)
-        # bucket.download(key, file_path)
-        # file_path = helpers.decompress_file(file_path)
-        # search_f = open(file_path)
-        # tweets = tweets_f.readlines()
-        # frequency[file] = tweets.count(query)
-        # search_f.close()
-        # os.remove(file_path)
+    gen_uniq_dir = lambda: os.path.join(config.working_dir, str(uuid.uuid4()))
+    tmp_dir = gen_uniq_dir()
+    while os.path.isdir(tmp_dir):
+        tmp_dir = gen_uniq_dir()
 
-        file_path = os.path.join("tmp", file, "search.txt")
-        if not os.path.isfile(file_path):
-            continue
-        search_f = open(file_path)
-        f_chunks = helpers.read_file_in_chunks(search_f)
-        curr_freq = 0
-        t = ""
-        for chunk in f_chunks:
-            chunk = t + chunk
-            curr_freq += chunk.count(query)
-            tl = len(query) - 1
-            t = chunk[-tl:]
+    os.mkdir(tmp_dir)
 
-        frequency[file] = curr_freq
-        search_f.close()
+    b = helpers.S3Bucket()
+    kl = b.find_keys("search.json")
+    helpers.S3Bucket.download_async(kl, tmp_dir)
 
+    for subdir, dirs, files in os.walk(tmp_dir):
+        for file in files:
+            file_path = os.path.join(subdir, file)
+            file_path = helpers.decompress_file(file_path)
+            with open(file_path, 'r') as json_file:
+                freq_dict = json.load(json_file)
+                date = subdir.split("\\")[-1]
+                frequency[date] = freq_dict[query]
+
+    shutil.rmtree(tmp_dir)
     ordered_freq = collections.OrderedDict(sorted(frequency.items()))
     return ordered_freq
 
