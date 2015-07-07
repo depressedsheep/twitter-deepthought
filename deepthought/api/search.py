@@ -54,13 +54,14 @@ def search(query):
     for subdir, dirs, files in os.walk(tmp_dir):
         for file in files:
             file_path = os.path.join(subdir, file)
-            file_path = helpers.decompress_file(file_path)
+            if file_path.lower().endswith(".bz2"):
+                file_path = helpers.decompress_file(file_path)
             with open(file_path, 'r') as json_file:
                 freq_dict = json.load(json_file)
-                date = subdir.split("\\")[-1]
+                date = subdir.split(os.sep)[-1]
                 frequency[date] = freq_dict[query]
 
-    shutil.rmtree(tmp_dir)
+    # shutil.rmtree(tmp_dir)
     ordered_freq = collections.OrderedDict(sorted(frequency.items()))
     return ordered_freq
 

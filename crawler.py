@@ -8,6 +8,8 @@ import logging
 import csv
 import threading
 import urllib2
+import traceback
+import shutil
 
 import twitter
 
@@ -39,7 +41,6 @@ class Crawler(threading.Thread):
         start_time (datetime): Time when the crawler started
         stream (twitter.TwitterStream): The Twitter stream where the crawler will get the tweets from
         dir (str): The current directory where the crawler is writing to
-        file_queue (Queue.Queue): The shared queue with the Processor thread to send files for processing
         status (dict): The current status of the crawler
         files (dict): A dict of files to be used in the crawler, namely tweets.csv and tps.csv
         writers (dict): A dict of CSV Writers to be used in the crawler
@@ -47,7 +48,7 @@ class Crawler(threading.Thread):
         stopped (bool): Boolean value indicating if crawler has stopped
     """
 
-    def __init__(self, file_queue):
+    def __init__(self):
         """Initializes crawler"""
         self.total_tweets = 0
         self.tps = 0
@@ -64,9 +65,6 @@ class Crawler(threading.Thread):
 
         # Initialize logging
         self.logger = logging.getLogger(__name__)
-
-        # Init file queue
-        self.file_queue = file_queue
 
     def run(self):
         """Main function for the collection of tweets
@@ -183,16 +181,11 @@ class Crawler(threading.Thread):
 
     def change_dir(self):
         """Sends the old files to the Processor and initializes a new directory"""
-        self.logger.info("Changing dir from '" + self.dir + "' to '" + self.get_curr_hour()  + "'")
+        self.logger.info("Changing dir from '" + self.dir + "' to '" + self.get_curr_hour() + "'")
 
         # Close the old files
         for (file_name, file_handle) in self.files.iteritems():
             file_handle.close()
-
-        # Send the file path of the old dir to processor
-        if self.file_queue is not None:
-            self.logger.warn("File '" + self.dir + "' sent by crawler")
-            self.file_queue.put(self.dir)
 
         # Init new dir
         self.init_dir()
@@ -205,8 +198,12 @@ class Crawler(threading.Thread):
         self.dir = self.get_curr_hour()
         self.logger.debug("Initializing dir '" + self.dir + "'")
 
-        if not os.path.exists(self.dir):
-            os.makedirs(self.dir)
+        # If directory already exists, delete it and make a new one
+        if os.path.exists(self.dir):
+            self.logger.warning("Dir '" + self.dir + "' already exists, deleting")
+            shutil.rmtree(self.dir)
+
+        os.makedirs(self.dir)
 
         # Creates and opens tweets.csv and tps.csv for writing
         # They will be closed when it's time to change dir or if the crawler has been stopped
@@ -231,3 +228,31 @@ class Crawler(threading.Thread):
             The working dir is prepended
         """
         return os.path.join(config.working_dir, time.strftime('%d-%m-%Y_%H'))
+
+
+def init_logging():
+    log_formatter = logging.Formatter(
+        fmt="[%(levelname)s] [%(asctime)s] [%(name)s]: %(message)s", datefmt="%m/%d/%Y %I:%M %p")
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    console_handler.setLevel(logging.DEBUG)
+    root_logger.addHandler(console_handler)
+
+
+if __name__ == "__main__":
+    crawler = Crawler()
+    init_logging()
+    while True:
+        try:
+            crawler.start()
+        except KeyboardInterrupt:
+            break
+        except:
+            dump_file_path = time.strftime('%d-%m-%Y_%H_%M') + ".dump"
+            div = "\n\n" + "-" * 50 + "\n\n"
+            print div + "Fatal error occurred in crawler! Dumping stack trace to '" + dump_file_path + "'" + div
+            traceback.print_exc(file=open(dump_file_path, 'wb'))
+        else:
+            break

@@ -16,6 +16,49 @@ import config
 module_logger = logging.getLogger(__name__)
 
 
+def init_logging():
+    """Initialize logging to file and console.
+
+    Log file has the format "app.log.%d-%m-%Y_%H-%M-%S"
+
+    Messages with level DEBUG and above gets logged to the file.
+
+    Messages with level INFO and above gets logged to the console.
+    """
+
+    # Create format for logging
+    log_formatter = logging.Formatter(
+        fmt="[%(levelname)s] [%(asctime)s] [%(name)s]: %(message)s",
+        datefmt="%m/%d/%Y %I:%M %p")
+
+    # Get root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    # Check if log dir exists, else create it
+    log_dir = os.path.join(config.log_dir, "")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    # Create path where log file is going to be stored
+    log_file = 'app.log'
+    log_path = os.path.join(log_dir, log_file)
+
+    # Create file handler which logs all messages with level DEBUG and above
+    # This file handler will change file every hour
+    file_handler = logging.handlers.TimedRotatingFileHandler(log_path)
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(logging.DEBUG)
+
+    # Create console handler which logs all messages with level INFO and above
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    console_handler.setLevel(logging.INFO)
+
+    # Add the handlers to the logger
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
 class S3Bucket(object):
     """ Helper functions related to S3 file operations
 
@@ -125,9 +168,10 @@ class S3Bucket(object):
             file_path (str): The file path where the downloaded file is stored
 
         """
-        module_logger.info("Downloading " + key.name)
         if file_path is None:
-            file_path = key.name.replace("/", "\\")
+            file_path = key.name
+        file_path.replace(os.sep, "/")
+        module_logger.info("Downloading " + key.name + " to " + file_path)
 
         d = os.path.dirname(file_path)
         if not os.path.exists(d):
@@ -140,12 +184,16 @@ class S3Bucket(object):
     def download_async(key_list, dir_path=""):
         def download_thread(k):
             b = S3Bucket()
-            b.download(k, os.path.join(dir_path, k.name.replace("/", "\\")))
+            b.download(k, os.path.join(dir_path, k.name.replace("/", os.sep)))
 
+        threads = []
         for key in key_list:
             t = threading.Thread(target=download_thread, args=(key,))
             t.start()
-            t.join()
+            threads.append(t)
+
+        for thread in threads:
+            thread.join()
 
 
 def upload_dir(dir_path):

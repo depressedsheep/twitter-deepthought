@@ -78,6 +78,7 @@ class Search(Resource):
         Returns:
             result (collections.OrderedDict): The results of the query
         """
+        reload(search)
         return search.search(query)
 
 
