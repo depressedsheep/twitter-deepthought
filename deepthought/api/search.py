@@ -1,12 +1,13 @@
 """This module provides the search functionality for the API module."""
 import calendar
 import collections
-import uuid
 import os
 import shutil
+import threading
+import Queue
 import json
 
-from deepthought import config, helpers
+from deepthought import helpers
 
 
 def search(query):
@@ -38,33 +39,57 @@ def search(query):
         ordered_freq (collections.OrderedDict): An ordered dict of (time, frequency) values
     """
 
-    frequency = {}
+    frequency = []
 
-    gen_uniq_dir = lambda: os.path.join(config.working_dir, str(uuid.uuid4()))
-    tmp_dir = gen_uniq_dir()
-    while os.path.isdir(tmp_dir):
-        tmp_dir = gen_uniq_dir()
+    # gen_uniq_dir = lambda: os.path.join(config.working_dir, str(uuid.uuid4()))
+    # tmp_dir = gen_uniq_dir()
+    # while os.path.isdir(tmp_dir):
+    # tmp_dir = gen_uniq_dir()
 
-    os.mkdir(tmp_dir)
-
+    dir = "search-cache"
     b = helpers.S3Bucket()
     kl = b.find_keys("search.json")
-    helpers.S3Bucket.download_async(kl, tmp_dir)
+    n = 0
+    if os.path.isdir(dir):
+        for root, dirs, files in os.walk(dir):
+            n += len(files)
+        if n != len(kl):
+            shutil.rmtree(dir)
+            helpers.S3Bucket.download_async(kl, dir)
+    else:
+        os.mkdir(dir)
+        helpers.S3Bucket.download_async(kl, dir)
 
-    for subdir, dirs, files in os.walk(tmp_dir):
+    def proc_file(f,s):
+        with open(f, 'r') as json_file:
+            freq_dict = json.load(json_file)
+            date = s.split(os.sep)[-1]
+            if query in freq_dict:
+                freq = freq_dict[query]
+            else:
+                freq = 0
+
+            frequency.append({date: freq})
+
+    threads = []
+    for subdir, dirs, files in os.walk(dir):
         for file in files:
             file_path = os.path.join(subdir, file)
             if file_path.lower().endswith(".bz2"):
                 file_path = helpers.decompress_file(file_path)
-            with open(file_path, 'r') as json_file:
-                freq_dict = json.load(json_file)
-                date = subdir.split(os.sep)[-1]
-                frequency[date] = freq_dict[query]
+            t = threading.Thread(target=proc_file, args=(file_path,subdir))
+            t.start()
+            threads.append(t)
 
-    # shutil.rmtree(tmp_dir)
-    ordered_freq = collections.OrderedDict(sorted(frequency.items()))
+    for t in threads:
+        t.join()
+
+    frequency_dict = {}
+    for d in frequency:
+        frequency_dict.update(d)
+
+    ordered_freq = collections.OrderedDict(sorted(frequency_dict.items()))
     return ordered_freq
-
 
 def get_dates_in_range(start, end):
     """Gets the list of dates, in increments of 1 hour, that falls within specified range

@@ -215,8 +215,7 @@ def upload_dir(dir_path):
             file_path = os.path.join(root, name)
 
             # Compress the file
-            compress_file(file_path)
-            file_path = os.path.join(dir_path, name) + ".bz2"
+            file_path = compress_file(file_path)
 
             # Upload the file
             try:

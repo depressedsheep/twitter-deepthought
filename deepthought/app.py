@@ -5,12 +5,11 @@ Attributes:
 """
 
 import logging
+import Queue
 
 from deepthought import helpers, console
 from deepthought.processing import processor
 from deepthought.api import api_server
-
-
 # List of threads
 threads = {}
 

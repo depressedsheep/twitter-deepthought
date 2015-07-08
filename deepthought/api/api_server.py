@@ -4,20 +4,25 @@ through this RESTful web API
 """
 import logging
 import threading
-import sys
+import collections
+import os
+import csv
+import uuid
 
 import flask
 import flask_restful
+
 from flask_restful import Resource
 
-from deepthought import config
+from deepthought import config, helpers
 from deepthought.api import search
 
 
 class APIServer(threading.Thread):
     """Runs a Flask server to serve the API"""
 
-    CrawlerStatus_url = 'crawler/status'
+    CrawlerTps_url = 'tps/<string:date>'
+    S3Dates_url = 's3/dates'
     Search_url = 'search/<string:query>'
 
     def __init__(self):
@@ -38,8 +43,9 @@ class APIServer(threading.Thread):
 
         # Setup the routes for the server
         api_base_url = config.api_base_url
-        api.add_resource(CrawlerStatus, api_base_url + self.CrawlerStatus_url)
+        api.add_resource(CrawlerTps, api_base_url + self.CrawlerTps_url)
         api.add_resource(Search, api_base_url + self.Search_url)
+        api.add_resource(S3Dates, api_base_url + self.S3Dates_url)
 
         # Run the Flask server on the specified port
         # The server is not run on the default port to prevent clashes
@@ -51,18 +57,31 @@ class APIServer(threading.Thread):
         self.logger.warn("API webservice stopped")
 
 
-class CrawlerStatus(Resource):
+class CrawlerTps(Resource):
     """Handle requests for the crawler's status"""
 
     @staticmethod
-    def get():
+    def get(date):
         """Handle GET requests
 
         Returns:
             status (dict): The status of the crawler
         """
-        from deepthought import app
-        return app.threads['crawler'].status
+        b = helpers.S3Bucket()
+        k = b.find_key(date + "/tps.csv.bz2")
+        if k is None or len(date) != 13:
+            return {"error": "Invalid date provided"}
+        fp = os.path.join(config.working_dir, str(uuid.uuid4()) + ".bz2")
+        b.download(k, fp)
+        fp = helpers.decompress_file(fp)
+        d = {}
+        with open(fp, 'r') as f:
+            dr = csv.DictReader(f)
+            for r in dr:
+                d[r['timestamp']] = r['tps']
+
+        os.remove(fp)
+        return collections.OrderedDict(sorted(d.items()))
 
 
 class Search(Resource):
@@ -78,10 +97,15 @@ class Search(Resource):
         Returns:
             result (collections.OrderedDict): The results of the query
         """
-        reload(search)
         return search.search(query)
 
 
-
-
-
+class S3Dates(Resource):
+    @staticmethod
+    def get():
+        b = helpers.S3Bucket()
+        kl = b.find_keys("tps.csv")
+        dl = []
+        for k in kl:
+            dl.append(k.name.split("/")[-2])
+        return dl

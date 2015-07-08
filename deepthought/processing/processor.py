@@ -1,20 +1,18 @@
 """This module communicates with the crawler and processes incoming files"""
 import logging
 import threading
+import os
+import re
 
-from deepthought import helpers
+from deepthought import config, helpers
+import crawler
 from deepthought.processing import analyser
 
 
 class Processor(threading.Thread):
-    """Processes incoming files from the crawler
+    """Processes incoming files from the crawler"""
 
-    Attributes:
-        file_queue (Queue.Queue): The shared queue between the Crawler and Processor to send files
-        stopped (bool): Boolean value indicating if Processor has stopped
-    """
-
-    def __init__(self, file_queue):
+    def __init__(self):
         """Initializes the Processor
 
         Args:
@@ -22,9 +20,6 @@ class Processor(threading.Thread):
         """
         super(Processor, self).__init__()
         self.logger = logging.getLogger(__name__)
-
-        self.file_queue = file_queue
-        self.stopped = False
 
     def run(self):
         """Main function to start processing of files received from the crawler
@@ -37,32 +32,39 @@ class Processor(threading.Thread):
         After analysis, the directory, along with the results of the analysis, will be uploaded to Amazon S3 servers.
         """
         self.logger.warn("Processor started")
+        self.scan_dir()
 
-        # Analyser object to be used to analyse files received
-        a = analyser.Analyser()
-        while True:
-            # Break out of the loop if Processor has been stopped
-            if self.stopped:
-                break
+    def scan_dir(self):
+        def analyse_dir(dir):
+            a = analyser.Analyser()
+            try:
+                a.analyse(dir)
+            except ValueError:
+                self.logger.error(dir + " is not a valid file path!?")
 
-            # Wait for the Crawler to put something into the shared queue
-            file_path = self.file_queue.get(block=True)
-            self.logger.warn("File '" + file_path + "' received by processor")
+            if not config.DEV_MODE:
+                helpers.upload_dir(dir)
 
-            # Start analysis of the files
-            a.analyse(file_path)
+        threads = list()
+        dirs = next(os.walk(config.working_dir))[1]
+        pattern = re.compile("\d{2}-\d{2}-\d{4}_\d{2}")
+        for dir in dirs:
+            if os.path.join(config.working_dir, dir) == crawler.Crawler.get_curr_hour() or not pattern.match(dir) or len(dir) != 13:
+                dirs.remove(dir)
+                continue
 
-            # Upload and delete the dir after analysis
-            helpers.upload_dir(file_path)
+            t = threading.Thread(target=analyse_dir, args=(os.path.join(config.working_dir, dir),))
+            t.start()
+            threads.append(t)
+
+        for t in threads:
+            t.join()
+
+        threading.Timer(5 * 60, self.scan_dir).start()
 
     def stop(self):
         """Stops the Processor
 
         It also checks if there were any queued files when the Processor was stopped.
         """
-        self.stopped = True
-
-        # Informs the user if there were queued files when the Processor was stopped
-        num_queued_files = str(self.file_queue.qsize())
-        if num_queued_files > 0:
-            self.logger.warn("Processor stopped with " + num_queued_files + " queued files")
+        self.logger.warn("Processor stopped")
