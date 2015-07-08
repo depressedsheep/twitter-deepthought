@@ -4,7 +4,6 @@ import collections
 import os
 import shutil
 import threading
-import Queue
 import json
 
 from deepthought import helpers
@@ -60,7 +59,9 @@ def search(query):
         os.mkdir(dir)
         helpers.S3Bucket.download_async(kl, dir)
 
-    def proc_file(f,s):
+    def proc_file(f, s):
+        if f.lower().endswith(".bz2"):
+            f = helpers.decompress_file(f)
         with open(f, 'r') as json_file:
             freq_dict = json.load(json_file)
             date = s.split(os.sep)[-1]
@@ -75,9 +76,7 @@ def search(query):
     for subdir, dirs, files in os.walk(dir):
         for file in files:
             file_path = os.path.join(subdir, file)
-            if file_path.lower().endswith(".bz2"):
-                file_path = helpers.decompress_file(file_path)
-            t = threading.Thread(target=proc_file, args=(file_path,subdir))
+            t = threading.Thread(target=proc_file, args=(file_path, subdir))
             t.start()
             threads.append(t)
 
@@ -90,6 +89,7 @@ def search(query):
 
     ordered_freq = collections.OrderedDict(sorted(frequency_dict.items()))
     return ordered_freq
+
 
 def get_dates_in_range(start, end):
     """Gets the list of dates, in increments of 1 hour, that falls within specified range

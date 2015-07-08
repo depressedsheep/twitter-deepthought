@@ -5,6 +5,7 @@ through this RESTful web API
 import logging
 import threading
 import collections
+import shutil
 import os
 import csv
 import uuid
@@ -21,8 +22,8 @@ from deepthought.api import search
 class APIServer(threading.Thread):
     """Runs a Flask server to serve the API"""
 
-    CrawlerTps_url = 'tps/<string:date>'
     S3Dates_url = 's3/dates'
+    S3Stats_url = "s3/stats/<string:date>"
     Search_url = 'search/<string:query>'
 
     def __init__(self):
@@ -43,60 +44,66 @@ class APIServer(threading.Thread):
 
         # Setup the routes for the server
         api_base_url = config.api_base_url
-        api.add_resource(CrawlerTps, api_base_url + self.CrawlerTps_url)
+        api.add_resource(S3Stats, api_base_url + self.S3Stats_url)
         api.add_resource(Search, api_base_url + self.Search_url)
         api.add_resource(S3Dates, api_base_url + self.S3Dates_url)
 
         # Run the Flask server on the specified port
         # The server is not run on the default port to prevent clashes
         self.logger.warn("API webservice started")
-        self.app.run(debug=False, port=config.api_port)
+        self.app.run(debug=False, port=config.api_port, host='0.0.0.0')
 
     def stop(self):
         """Stop the API server"""
         self.logger.warn("API webservice stopped")
 
 
-class CrawlerTps(Resource):
-    """Handle requests for the crawler's status"""
-
+class S3Stats(Resource):
     @staticmethod
     def get(date):
-        """Handle GET requests
-
-        Returns:
-            status (dict): The status of the crawler
-        """
         b = helpers.S3Bucket()
-        k = b.find_key(date + "/tps.csv.bz2")
-        if k is None or len(date) != 13:
+        kl = b.find_keys(date)
+        if len(kl) == 0 or len(date) != 13:
             return {"error": "Invalid date provided"}
-        fp = os.path.join(config.working_dir, str(uuid.uuid4()) + ".bz2")
-        b.download(k, fp)
-        fp = helpers.decompress_file(fp)
-        d = {}
-        with open(fp, 'r') as f:
-            dr = csv.DictReader(f)
-            for r in dr:
-                d[r['timestamp']] = r['tps']
 
-        os.remove(fp)
-        return collections.OrderedDict(sorted(d.items()))
+        dp = os.path.join(config.working_dir, str(uuid.uuid4()))
+        for k in kl:
+            if any(ss in k.name for ss in ['tps', 'ema', 'growth', 'spikes']):
+                b.download(k, os.path.join(dp, k.name))
+
+        stats = collections.defaultdict(dict)
+
+        def proc_file(fp):
+            s = fp.split(os.sep)[-1].split(".")[0].lower()
+            if fp.lower().endswith(".bz2"):
+                fp = helpers.decompress_file(fp)
+            with open(fp, 'r') as f:
+                dr = csv.DictReader(f)
+                for r in dr:
+                    stats[s][r['timestamp']] = r[s]
+
+        threads = []
+        for subdir, dirs, files in os.walk(dp):
+            for file in files:
+                file_path = os.path.join(subdir, file)
+                t = threading.Thread(target=proc_file, args=(file_path,))
+                t.start()
+                threads.append(t)
+
+        for t in threads:
+            t.join()
+
+        shutil.rmtree(dp)
+
+        s = {}
+        for i, d in stats.iteritems():
+            s[i] = collections.OrderedDict(sorted(d.items()))
+        return s
 
 
 class Search(Resource):
-    """Handle search requests"""
-
     @staticmethod
     def get(query):
-        """Handle GET requests
-
-        Args:
-            query (str): The keyword to be searched
-
-        Returns:
-            result (collections.OrderedDict): The results of the query
-        """
         return search.search(query)
 
 
