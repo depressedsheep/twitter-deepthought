@@ -10,7 +10,7 @@ import logging
 from nltk.corpus import stopwords
 
 from deepthought import config
-
+from langprocess import LanguageProcesser
 
 class Analyser(object):
     """Analyses tweets.csv and tps.csv and saves the result for later use
@@ -59,6 +59,9 @@ class Analyser(object):
 
         # Run spike detection function
         self.find_spikes()
+
+        #Run keyword generation
+        LanguageProceser(tweets_f_path)
 
         self.logger.info("Analysing done for '" + dir_path + "'")
 
